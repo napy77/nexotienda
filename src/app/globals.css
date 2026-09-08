@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+:root {
+  --nexo-amarillo: #ffe600;
+}
+
+body {
+  background: #ebebeb;
+}

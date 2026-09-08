@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+*.swp
+
+*.tsbuildinfo
+next-env.d.ts
+
+# Documentos fuente del proyecto. Viven fuera del repo: no son código,
+# no cambian con el código, y pesan 95 MB.
+contexto/
