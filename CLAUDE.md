@@ -7,6 +7,8 @@ comprador viven en **ClubPay**.
 El diseño completo está en el documento fundacional (v0.2), con cada decisión numerada
 `D1`–`D44`, los principios `P1`–`P6`, los riesgos `R1`–`R9` y lo abierto `A1`–`A7`.
 Cuando algo de acá no alcance, la referencia es ese documento.
+Lo que le pedimos a NexoPOS —y lo que tiene que construir de su lado— está en
+[docs/nexopos.md](docs/nexopos.md).
 
 ## Superficies
 

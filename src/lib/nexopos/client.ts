@@ -1,7 +1,7 @@
 /**
  * Adapter HTTP contra la API real de NexoPOS.
  *
- * La forma de las rutas está en `docs/contrato-nexopos.md`. Mientras el equipo de
+ * La forma de las rutas está en `docs/nexopos.md`. Mientras el equipo de
  * NexoPOS la construye, `index.ts` sigue eligiendo los fixtures.
  *
  * La API key vive solo acá, del lado del servidor. Nunca viaja al navegador.
