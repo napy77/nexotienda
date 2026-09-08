@@ -84,7 +84,7 @@ export function Catalog({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {shown.map((p) => (
-            <ProductCard key={p.id} product={p} storeName={store.name} />
+            <ProductCard key={p.id} product={p} storeName={store.name} storeSlug={store.slug} />
           ))}
         </div>
       )}

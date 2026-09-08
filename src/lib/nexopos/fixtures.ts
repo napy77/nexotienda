@@ -309,6 +309,9 @@ export const fixtures: NexoPosPort = {
       slotKind: slot.kind,
       address: input.address,
       paymentMethod: input.paymentMethod,
+      // El fiado no es un pago: es una anotación que se cobra en el cierre (D27).
+      // El efectivo tampoco pasa por acá. Solo el rail online queda pendiente.
+      paymentStatus: input.paymentMethod === 'online' ? 'pendiente' : 'no_aplica',
       // Nace en 'recibido'. Que el comercio se entere no es que haya aceptado (D18).
       status: 'recibido',
       createdAt: new Date().toISOString(),
@@ -319,5 +322,32 @@ export const fixtures: NexoPosPort = {
 
   async getOrder(code) {
     return orders.get(code) ?? null;
+  },
+
+  async confirmOrderPayment(code, paymentId) {
+    const order = orders.get(code);
+    if (!order) return null;
+    const next = { ...order, paymentStatus: 'pagado' as const, paymentId };
+    orders.set(code, next);
+    return next;
+  },
+
+  async registerAccountPayment({ personId, storeId, periodId, amountCents }) {
+    if (personId !== person.personId) return null;
+    const account = accounts.find((a) => a.storeId === storeId);
+    if (!account) return null;
+
+    const period = account.periods.find((p) => p.id === periodId);
+    if (!period) return null;
+
+    // Pago parcial permitido (D31). Lo que sobra de este período quedaría para
+    // imputar al siguiente más viejo; con un solo período cerrado no aplica todavía.
+    const paid = Math.min(period.paidCents + amountCents, period.totalCents);
+    period.paidCents = paid;
+    period.status = paid >= period.totalCents ? 'pagado' : 'pagado_parcial';
+
+    // Pagar libera disponible en ESE comercio, que es el único acreedor (P1).
+    account.availableCents += amountCents;
+    return account;
   },
 };

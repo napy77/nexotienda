@@ -65,7 +65,8 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         return;
       }
       cart.clear();
-      router.push(`/s/${store.slug}/pedido/${res.code}`);
+      // Si hay que cobrar, primero el cobro; el pedido ya quedó hecho igual.
+      router.push(res.checkoutUrl ?? `/s/${store.slug}/pedido/${res.code}`);
     });
   }
 
@@ -186,10 +187,17 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
                 <input
                   type="radio"
                   name="pay"
-                  checked={payment === 'clubpay'}
-                  onChange={() => setPayment('clubpay')}
+                  checked={payment === 'online'}
+                  onChange={() => setPayment('online')}
                 />
-                <span className="text-sm font-semibold text-neutral-900">Pagar con ClubPay</span>
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold text-neutral-900">
+                    Pagar ahora
+                  </span>
+                  <span className="block text-xs text-neutral-500">
+                    Con ClubPay, tarjeta o transferencia
+                  </span>
+                </span>
               </label>
             )}
 

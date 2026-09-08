@@ -3,6 +3,7 @@ import { BookMarked } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
 import { money, longDate, shortDate } from '@/lib/format';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
+import { PayPeriod } from '@/components/PayPeriod';
 
 const DEMO_PERSON = 'per_7f3a91c2';
 
@@ -94,7 +95,11 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-neutral-500">
-                        {p.status === 'pagado' ? 'Pagado' : 'Queda por pagar'}
+                        {p.status === 'pagado'
+                          ? 'Pagado'
+                          : p.paidCents > 0
+                            ? `Pagaste ${money(p.paidCents)} · queda`
+                            : 'Queda por pagar'}
                       </p>
                       <p className="text-lg font-black text-neutral-900">
                         {money(p.status === 'pagado' ? p.totalCents : pending)}
@@ -134,13 +139,14 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
                           : `Arreglalo directamente con ${store.name}.`}
                       </p>
                       {store.acceptsOnlinePayment ? (
-                        <button
-                          disabled
-                          title="El pago se habilita con el handoff de ClubPay"
-                          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white opacity-50"
-                        >
-                          Pagar {money(pending)}
-                        </button>
+                        <PayPeriod
+                          personId={DEMO_PERSON}
+                          storeId={store.id}
+                          storeSlug={store.slug}
+                          storeName={store.name}
+                          periodId={p.id}
+                          pendingCents={pending}
+                        />
                       ) : (
                         <ContactButton store={store} />
                       )}

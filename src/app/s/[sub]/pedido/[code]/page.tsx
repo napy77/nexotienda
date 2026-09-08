@@ -19,8 +19,14 @@ const STEPS: { key: OrderStatus; label: string; hint: string }[] = [
 
 const PAYMENT_LABEL: Record<string, string> = {
   efectivo_entrega: 'Efectivo al recibir',
-  clubpay: 'ClubPay',
+  online: 'Pagado online',
   cuenta_corriente: 'Anotado en la libreta',
+};
+
+const PAYMENT_STATE: Record<string, { text: string; tone: string }> = {
+  pendiente: { text: 'Falta pagarlo', tone: 'bg-amber-100 text-amber-800' },
+  pagado: { text: 'Pagado', tone: 'bg-emerald-100 text-emerald-800' },
+  rechazado: { text: 'El pago no salió', tone: 'bg-red-100 text-red-800' },
 };
 
 export default async function PedidoPage({
@@ -109,13 +115,31 @@ export default async function PedidoPage({
             )}
             <div className="flex justify-between">
               <dt className="text-neutral-600">Pago</dt>
-              <dd className="font-medium">{PAYMENT_LABEL[order.paymentMethod]}</dd>
+              <dd className="flex items-center gap-2 font-medium">
+                {PAYMENT_LABEL[order.paymentMethod]}
+                {order.paymentStatus !== 'no_aplica' && (
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                      PAYMENT_STATE[order.paymentStatus].tone
+                    }`}
+                  >
+                    {PAYMENT_STATE[order.paymentStatus].text}
+                  </span>
+                )}
+              </dd>
             </div>
             <div className="mt-2 flex justify-between border-t border-neutral-200 pt-2 text-base">
               <dt className="font-bold">Total</dt>
               <dd className="font-bold">{money(order.totalCents)}</dd>
             </div>
           </dl>
+
+          {order.paymentStatus === 'pendiente' && (
+            <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+              El pedido ya le llegó a {store.name}, pero el pago quedó sin completar.
+              Podés pagarlo cuando lo retires o hablando con ellos.
+            </p>
+          )}
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <ContactButton store={store} />

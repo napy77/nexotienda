@@ -59,4 +59,22 @@ export const client: NexoPosPort = {
   createOrder: (order: NewOrder) =>
     get<Order>('/v1/orders', { method: 'POST', body: JSON.stringify(order) }),
   getOrder: (code) => get<Order | null>(`/v1/orders/${code}`),
+  confirmOrderPayment: (code, paymentId) =>
+    get<Order | null>(`/v1/orders/${code}/payment`, {
+      method: 'POST',
+      body: JSON.stringify({ paymentId }),
+    }),
+
+  registerAccountPayment: (input) =>
+    get<MerchantAccount | null>(
+      `/v1/people/${input.personId}/accounts/${input.storeId}/payments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          periodId: input.periodId,
+          amountCents: input.amountCents,
+          paymentId: input.paymentId,
+        }),
+      },
+    ),
 };

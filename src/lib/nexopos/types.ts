@@ -183,7 +183,15 @@ export interface Person {
 // Pedido
 // ---------------------------------------------------------------------------
 
-export type PaymentMethod = 'cuenta_corriente' | 'clubpay' | 'efectivo_entrega';
+export type PaymentMethod = 'cuenta_corriente' | 'online' | 'efectivo_entrega';
+
+/**
+ * Estado del cobro, que es otra cosa que el estado del pedido.
+ *
+ * `no_aplica` es el caso del efectivo y del fiado: no hay nada que cobrar online.
+ * El fiado no es un pago — es una anotación que se cobra en el cierre (D27).
+ */
+export type PaymentStatus = 'no_aplica' | 'pendiente' | 'pagado' | 'rechazado';
 
 /** D18: la notificación no es una aceptación. */
 export type OrderStatus =
@@ -217,6 +225,9 @@ export interface Order {
   slotKind: 'retiro' | 'reparto';
   address?: string;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  /** Id del cobro en el proveedor, cuando hubo uno. */
+  paymentId?: string;
   status: OrderStatus;
   createdAt: string;
   /** Lo declara el comercio al aceptar. Nunca lo promete la plataforma (D20). */
@@ -275,4 +286,18 @@ export interface NexoPosPort {
 
   createOrder(order: NewOrder): Promise<Order>;
   getOrder(code: string): Promise<Order | null>;
+  /** El cobro se acreditó: el pedido queda pagado. */
+  confirmOrderPayment(code: string, paymentId: string): Promise<Order | null>;
+
+  /**
+   * Registra un pago contra un resumen del comercio. Admite pago parcial y se imputa
+   * del período más viejo al más nuevo (D31).
+   */
+  registerAccountPayment(input: {
+    personId: string;
+    storeId: string;
+    periodId: string;
+    amountCents: number;
+    paymentId: string;
+  }): Promise<MerchantAccount | null>;
 }

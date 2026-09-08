@@ -4,7 +4,18 @@ import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
 import { Catalog } from '@/components/Catalog';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
+import { StoreHero } from '@/components/StoreHero';
 import { TownSearch } from '@/components/TownSearch';
+import { ValueProps } from '@/components/ValueProps';
+
+/** Mientras no exista el handoff desde ClubPay, la persona de prueba es fija. */
+const DEMO_PERSON = 'per_7f3a91c2';
+
+/** Foto de portada por comercio. Cuando NexoPOS la exponga, sale del `Store`. */
+const COVERS: Record<string, string> = {
+  supersol: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&q=80',
+  donarosa: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&q=80',
+};
 
 type Props = { params: Promise<{ sub: string }> };
 
@@ -88,13 +99,15 @@ export default async function SubdomainPage({ params }: Props) {
     );
   }
 
-  const [pasillos, products] = await Promise.all([
+  const [pasillos, products, account] = await Promise.all([
     nexopos.listPasillos(store.id),
     nexopos.listProducts(store.id),
+    nexopos.getAccount(DEMO_PERSON, store.id),
   ]);
 
   return (
-    <StoreShell store={store}>
+    <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={COVERS[store.slug]} />}>
+      <ValueProps store={store} account={account} />
       <Catalog store={store} pasillos={pasillos} products={products} />
     </StoreShell>
   );

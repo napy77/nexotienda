@@ -1,12 +1,21 @@
 'use client';
 
+import Link from 'next/link';
 import { Barcode, Check, Minus, Plus, Sparkles } from 'lucide-react';
 import { money } from '@/lib/format';
 import type { Product } from '@/lib/nexopos/types';
 import { AvailabilityNote, isBuyable } from './Availability';
 import { useCart } from './CartProvider';
 
-export function ProductCard({ product, storeName }: { product: Product; storeName: string }) {
+export function ProductCard({
+  product,
+  storeName,
+  storeSlug,
+}: {
+  product: Product;
+  storeName: string;
+  storeSlug: string;
+}) {
   const cart = useCart();
   const qty = cart.quantityOf(product.id);
   const buyable = isBuyable(product.availability);
@@ -32,7 +41,10 @@ export function ProductCard({ product, storeName }: { product: Product; storeNam
           ) : null}
         </div>
 
-        <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-50 sm:h-48">
+        <Link
+          href={`/s/${storeSlug}/producto/${product.id}`}
+          className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-50 sm:h-48"
+        >
           {product.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -59,7 +71,7 @@ export function ProductCard({ product, storeName }: { product: Product; storeNam
               </span>
             )}
           </div>
-        </div>
+        </Link>
       </div>
 
       <div className="flex flex-1 flex-col justify-between p-3 pt-0">
@@ -69,8 +81,13 @@ export function ProductCard({ product, storeName }: { product: Product; storeNam
               {product.brand}
             </p>
           )}
-          <h3 className="line-clamp-2 min-h-[2.5rem] text-xs leading-snug font-semibold text-neutral-800 sm:text-sm">
-            {product.name}
+          <h3 className="min-h-[2.5rem]">
+            <Link
+              href={`/s/${storeSlug}/producto/${product.id}`}
+              className="line-clamp-2 text-xs leading-snug font-semibold text-neutral-800 hover:text-blue-700 sm:text-sm"
+            >
+              {product.name}
+            </Link>
           </h3>
 
           <div className="mt-2">
