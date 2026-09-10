@@ -137,7 +137,17 @@ EOF
   chmod 640 /etc/acme-dns/config.cfg
   echo "  config generada"
 else
-  echo "  config ya existe, no se toca"
+  # La config se preserva —puede tener cambios a mano— salvo la dirección de
+  # escucha, que se deriva de la máquina y no puede quedar congelada en un valor
+  # viejo. Si no coincide, se corrige: dejarla mal hace que el daemon no arranque
+  # y el motivo real quede tapado por un deadlock.
+  ACTUAL=$(grep -oP '^listen\s*=\s*"\K[^"]+' /etc/acme-dns/config.cfg || true)
+  if [[ "$ACTUAL" != "${BIND_IP}:53" ]]; then
+    sed -i "s|^listen = .*|listen = \"${BIND_IP}:53\"|" /etc/acme-dns/config.cfg
+    echo "  config ya existía · listen corregido: ${ACTUAL:-vacío} → ${BIND_IP}:53"
+  else
+    echo "  config ya existe y el listen es correcto, no se toca"
+  fi
 fi
 
 echo "══ 4/6 · Servicio ═══════════════════════════════════════════════"
