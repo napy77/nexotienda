@@ -52,12 +52,23 @@ if (( ${#MISSING[@]} )); then
 fi
 echo "  ok"
 
-echo "══ 1/6 · El puerto 53 tiene que estar libre ═════════════════════"
-if ss -lntu 2>/dev/null | grep -qE ':53\s'; then
-  systemctl is-active --quiet acme-dns \
-    || fail "Algo ya escucha en el 53. Revisar con: ss -lntup | grep :53"
+echo "══ 1/6 · El puerto 53 ═══════════════════════════════════════════"
+# En Ubuntu, systemd-resolved escucha en 127.0.0.53:53. Eso NO estorba: acme-dns
+# se ata solo a la IP pública, así que conviven. Lo que sí estorba es algo atado
+# a 0.0.0.0:53, a [::]:53 o a la IP pública, porque ahí sí chocan.
+CONFLICTO=$(ss -lntuHn 2>/dev/null \
+  | grep -E "(^|[[:space:]])(0\.0\.0\.0|\[::\]|${PUBLIC_IP//./\\.}):53([[:space:]]|$)" || true)
+
+if [[ -n "$CONFLICTO" ]] && ! systemctl is-active --quiet acme-dns; then
+  echo "$CONFLICTO" >&2
+  fail "Hay algo atado al puerto 53 en una dirección que necesitamos. Ver arriba."
 fi
-echo "  libre"
+
+if ss -lntuHn 2>/dev/null | grep -q '127\.0\.0\.53:53'; then
+  echo "  systemd-resolved está en 127.0.0.53:53 — no molesta, nos atamos a ${PUBLIC_IP}"
+else
+  echo "  libre"
+fi
 
 echo "══ 2/6 · Binario ════════════════════════════════════════════════"
 id acmedns &>/dev/null || useradd --system --no-create-home --shell /usr/sbin/nologin acmedns
@@ -80,7 +91,9 @@ echo "══ 3/6 · Configuración ═══════════════
 if [[ ! -f /etc/acme-dns/config.cfg ]]; then
   cat > /etc/acme-dns/config.cfg <<EOF
 [general]
-listen = "0.0.0.0:53"
+# Solo la IP pública: así convive con el systemd-resolved del sistema,
+# que se ata a 127.0.0.53:53. Atarse a 0.0.0.0 chocaría con él.
+listen = "${PUBLIC_IP}:53"
 protocol = "both"
 domain = "${ACME_ZONE}"
 nsname = "${NS_NAME}"
