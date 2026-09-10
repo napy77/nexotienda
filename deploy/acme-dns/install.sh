@@ -14,8 +14,13 @@
 # los tres registros en Plesk, no se toca el DNS nunca más: ni para renovar, ni para
 # dar de alta un comercio nuevo.
 #
-# Uso, como root en 181.111.252.198:
-#   sudo bash install.sh
+# Es autocontenido: no necesita el repo clonado ni ningún archivo al lado.
+#
+# Uso, como root en el VPS de la app (181.111.252.198):
+#
+#   curl -fsSL -o /tmp/acme-dns-install.sh \
+#     https://raw.githubusercontent.com/napy77/nexotienda/main/deploy/acme-dns/install.sh
+#   sudo bash /tmp/acme-dns-install.sh
 #
 set -euo pipefail
 
@@ -32,6 +37,20 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 fail() { echo "✗ $*" >&2; exit 1; }
+
+echo "══ 0/6 · Dependencias ═══════════════════════════════════════════"
+MISSING=()
+command -v curl    >/dev/null || MISSING+=(curl)
+command -v tar     >/dev/null || MISSING+=(tar)
+command -v dig     >/dev/null || MISSING+=(bind9-dnsutils)
+command -v python3 >/dev/null || MISSING+=(python3)
+command -v certbot >/dev/null || MISSING+=(certbot)
+if (( ${#MISSING[@]} )); then
+  echo "  instalando: ${MISSING[*]}"
+  apt-get update -qq
+  apt-get install -y -qq "${MISSING[@]}"
+fi
+echo "  ok"
 
 echo "══ 1/6 · El puerto 53 tiene que estar libre ═════════════════════"
 if ss -lntu 2>/dev/null | grep -qE ':53\s'; then
@@ -99,7 +118,29 @@ else
 fi
 
 echo "══ 4/6 · Servicio ═══════════════════════════════════════════════"
-cp "$(dirname "$0")/acme-dns.service" /etc/systemd/system/
+cat > /etc/systemd/system/acme-dns.service <<'UNIT'
+[Unit]
+Description=acme-dns (solo sirve los TXT de validación de Let's Encrypt)
+After=network.target
+
+[Service]
+Type=simple
+User=acmedns
+Group=acmedns
+WorkingDirectory=/opt/acme-dns
+ExecStart=/opt/acme-dns/acme-dns -c /etc/acme-dns/config.cfg
+Restart=always
+RestartSec=5
+# Para escuchar en el 53 sin correr como root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/acme-dns
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
 systemctl daemon-reload
 systemctl enable --quiet acme-dns
 systemctl restart acme-dns
@@ -122,16 +163,47 @@ fi
 echo "══ 6/6 · Registro de la cuenta ══════════════════════════════════"
 CREDS=/etc/acme-dns/registro.json
 if [[ ! -f "$CREDS" ]]; then
-  curl -sS -X POST "http://127.0.0.1:${API_PORT}/register" -o "$CREDS"
+  curl -sS --retry 3 --retry-delay 2 -X POST \
+    "http://127.0.0.1:${API_PORT}/register" -o "$CREDS" \
+    || fail "La API de acme-dns no respondió en 127.0.0.1:${API_PORT}."
   chmod 600 "$CREDS"
   echo "  cuenta registrada"
 else
   echo "  ya había una cuenta registrada, se reusa"
 fi
 
-FULL=$(python3 -c "import json;print(json.load(open('$CREDS'))['fulldomain'])")
+# Si el registro salió mal, el archivo queda con basura y el CNAME que
+# imprimiríamos sería inservible. Mejor cortar acá.
+FULL=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); ks=('username','password','subdomain','fulldomain'); sys.exit(1) if not all(k in d for k in ks) else print(d['fulldomain'])" "$CREDS" 2>/dev/null || true)
 
-install -m 755 "$(dirname "$0")/auth-hook.sh" /etc/acme-dns/auth-hook.sh
+if [[ -z "$FULL" ]]; then
+  echo "--- contenido de $CREDS ---" >&2
+  cat "$CREDS" >&2
+  rm -f "$CREDS"
+  fail "El registro no devolvió credenciales válidas. Se borró el archivo; volvé a correr el script."
+fi
+
+cat > /etc/acme-dns/auth-hook.sh <<'HOOK'
+#!/usr/bin/env bash
+# Hook de validación para certbot. Publica el TXT en acme-dns, que corre acá al
+# lado. No toca el DNS de nexotienda.app: solo la zona delegada.
+# Queda guardado en la config de renovación, así que las renovaciones lo reusan.
+set -euo pipefail
+CREDS=/etc/acme-dns/registro.json
+API=http://127.0.0.1:8081
+[[ -f "$CREDS" ]] || { echo "Falta $CREDS." >&2; exit 1; }
+USER=$(python3 -c "import json;print(json.load(open('$CREDS'))['username'])")
+PASS=$(python3 -c "import json;print(json.load(open('$CREDS'))['password'])")
+SUB=$(python3  -c "import json;print(json.load(open('$CREDS'))['subdomain'])")
+RESP=$(curl -sS -X POST "$API/update" \
+  -H "X-Api-User: $USER" -H "X-Api-Key: $PASS" \
+  -H "Content-Type: application/json" \
+  -d "{\"subdomain\":\"$SUB\",\"txt\":\"$CERTBOT_VALIDATION\"}")
+grep -q "$CERTBOT_VALIDATION" <<<"$RESP" || {
+  echo "acme-dns no aceptó el TXT: $RESP" >&2; exit 1; }
+sleep 5
+HOOK
+chmod 755 /etc/acme-dns/auth-hook.sh
 
 cat <<EOF
 

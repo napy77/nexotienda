@@ -91,13 +91,20 @@ Lo que se gana, y es más de lo que parece:
 
 ### Paso 1 · Instalar acme-dns — en el VPS de la app
 
+Es autocontenido: no necesita el repo clonado ni ningún archivo al lado.
+
 ```bash
-sudo bash /opt/nexotienda/deploy/acme-dns/install.sh
+curl -fsSL -o /tmp/acme-dns-install.sh https://raw.githubusercontent.com/napy77/nexotienda/main/deploy/acme-dns/install.sh
 ```
 
-Baja el binario, lo deja corriendo como servicio en el puerto 53 (verificado: está
-libre en ese VPS), registra la cuenta, y **te imprime los tres registros exactos**
-que hay que cargar en Plesk, con el id ya generado.
+```bash
+sudo bash /tmp/acme-dns-install.sh
+```
+
+Instala lo que falte (`curl`, `tar`, `dig`, `certbot`), baja el binario, lo deja
+corriendo como servicio en el puerto 53 —verificado: está libre en ese VPS—, registra
+la cuenta, y **te imprime los tres registros exactos** para Plesk, con el id ya
+generado.
 
 ### Paso 2 · Los tres registros — en el panel de Plesk
 
