@@ -21,6 +21,21 @@ CREDS=/etc/acme-dns/registro.json
 
 command -v dig >/dev/null || { echo "Falta dig:  apt-get install -y bind9-dnsutils" >&2; exit 1; }
 
+# Se consulta por un resolver público, no por el del sistema.
+#
+# El resolver local guarda cachés negativas: si se consultó un nombre antes de
+# crearlo —cosa que pasa siempre mientras se configura— se queda con el "no existe"
+# hasta que venza el TTL negativo del SOA, que acá son 3 horas. Y lo que importa no
+# es lo que ve esta máquina: es lo que va a ver Let's Encrypt.
+RESOLVER=""
+for r in 1.1.1.1 8.8.8.8 9.9.9.9; do
+  if dig @"$r" +short A example.com +time=3 +tries=1 >/dev/null 2>&1; then RESOLVER="@$r"; break; fi
+done
+if [[ -z "$RESOLVER" ]]; then
+  echo "  ⚠ Sin resolver público alcanzable; se usa el del sistema, que puede tener"
+  echo "    caché negativa. Si algo sale mal: resolvectl flush-caches"
+fi
+
 OK=0
 FALLA=0
 ok()   { echo "  ✔ $*"; OK=$((OK+1)); }
@@ -35,8 +50,8 @@ echo "══ Los tres registros de Plesk ═════════════
 # El comodín *.nexotienda.app contesta por cualquier nombre, así que hay que
 # distinguir el registro puesto a propósito del que responde de rebote. Si no, se
 # da por configurado algo que no está.
-COMODIN=$(dig +short A "zzz-inexistente-$$.${DOMAIN}" | head -1)
-A=$(dig +short A "$NS_NAME" | head -1)
+COMODIN=$(dig $RESOLVER +short A "zzz-inexistente-$$.${DOMAIN}" | head -1)
+A=$(dig $RESOLVER +short A "$NS_NAME" | head -1)
 if [[ "$A" == "$PUBLIC_IP" && "$COMODIN" == "$PUBLIC_IP" ]]; then
   aviso "1· $NS_NAME resuelve, pero por el comodín *.${DOMAIN} — no hay un A propio."
   aviso "    Funciona igual. Conviene ponerlo explícito: si el comodín cambia, se rompe."
@@ -49,7 +64,7 @@ else
 fi
 
 # 2 · La delegación.
-NS=$(dig +short NS "$ACME_ZONE" | head -1)
+NS=$(dig $RESOLVER +short NS "$ACME_ZONE" | head -1)
 if [[ "$NS" == "${NS_NAME}." ]]; then
   ok "2· $ACME_ZONE  NS  $NS"
 elif [[ -n "$NS" ]]; then
@@ -63,7 +78,7 @@ ESPERADO=""
 if [[ -f "$CREDS" ]]; then
   ESPERADO=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['fulldomain'])" "$CREDS" 2>/dev/null || true)
 fi
-CN=$(dig +short CNAME "$CHALLENGE" | head -1)
+CN=$(dig $RESOLVER +short CNAME "$CHALLENGE" | head -1)
 if [[ -z "$CN" ]]; then
   mal "3· falta el CNAME de $CHALLENGE${ESPERADO:+ → ${ESPERADO}.}"
 elif [[ -n "$ESPERADO" && "$CN" != "${ESPERADO}." ]]; then
@@ -109,13 +124,22 @@ if [[ -z "$CN" ]]; then
   aviso "la cadena no se puede probar hasta que esté el CNAME del punto 3"
   ESTADO=SKIP
 else
-  ESTADO=$(dig +noall +comments TXT "$CHALLENGE" 2>/dev/null | grep -o "status: [A-Z]*" | head -1 | cut -d' ' -f2)
+  ESTADO=$(dig $RESOLVER +noall +comments TXT "$CHALLENGE" 2>/dev/null | grep -o "status: [A-Z]*" | head -1 | cut -d' ' -f2)
 fi
 case "$ESTADO" in
   SKIP) ;;
-  NOERROR) ok "la cadena resuelve (status NOERROR; sin TXT todavía, es lo normal)" ;;
+  # Sin desafío publicado todavía, acme-dns puede contestar NOERROR sin datos o
+  # NXDOMAIN según el caso. Las dos son normales: lo que importa es que la cadena
+  # llegue hasta él, y eso se prueba abajo resolviendo la zona delegada por DNS
+  # público, sin preguntarle directo al daemon.
+  NOERROR|NXDOMAIN)
+    if dig $RESOLVER +short SOA "$ACME_ZONE" +time=5 +tries=2 | grep -q .; then
+      ok "la cadena llega a acme-dns a través de la delegación (sin TXT todavía, normal)"
+    else
+      mal "la delegación no resuelve por DNS público. ¿Propagó el NS del punto 2?"
+    fi
+    ;;
   SERVFAIL) mal "la cadena da SERVFAIL: la delegación está rota o el daemon no contesta" ;;
-  NXDOMAIN) mal "la cadena da NXDOMAIN: falta el CNAME o el nombre está mal escrito" ;;
   *) mal "respuesta inesperada consultando $CHALLENGE (${ESTADO:-sin respuesta})" ;;
 esac
 
