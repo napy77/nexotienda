@@ -12,6 +12,21 @@ script no toca nada de ellos:
 
 El puerto 3100 es a propósito: el 3000 ya lo usa el frontend de NexoPOS.
 
+> ### Ojo con el caché de `raw.githubusercontent.com`
+>
+> Las URLs de `.../main/...` las cachea el CDN de GitHub unos minutos, así que
+> podés bajar una versión vieja sin enterarte — y el síntoma es que el script
+> "sigue igual" después de un arreglo.
+>
+> Si acabás de pushear un cambio, usá la URL fijada al commit:
+>
+> ```bash
+> git rev-parse HEAD    # en tu máquina
+> # y reemplazá "main" por ese SHA en la URL
+> ```
+>
+> Y antes de correr, comprobá que bajaste la buena: `head -30 /tmp/loquesea.sh`
+
 ## La primera vez
 
 En el servidor todavía no hay nada, así que el script hay que bajarlo suelto. Dos
