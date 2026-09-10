@@ -1,0 +1,20 @@
+[Unit]
+Description=NexoTienda (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=nexotienda
+WorkingDirectory=/opt/nexotienda
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/nexotienda/.env
+# 3000 lo usa el frontend de NexoPOS en este mismo servidor.
+ExecStart=/usr/bin/npx next start -p 3100
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

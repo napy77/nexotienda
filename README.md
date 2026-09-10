@@ -23,6 +23,18 @@ El ruteo es por subdominio, así que hay que entrar por uno:
 | http://jure.localhost:3000 | Comercio con cartel pero sin tienda publicada |
 | http://morrison.localhost:3000 | Página del pueblo: buscador de existencias |
 
+## Deploy
+
+Corre en el mismo VPS que NexoPOS y ClubPay, en el puerto 3100 (el 3000 lo usa el
+frontend de NexoPOS).
+
+```bash
+sudo bash /opt/nexotienda/deploy/deploy.sh
+```
+
+Antes de la primera vez hacen falta el comodín de DNS y el certificado:
+ver [deploy/README.md](deploy/README.md).
+
 ## Estado
 
 Corre contra **fixtures** con los datos del prototipo de diseño. El día que exista la
