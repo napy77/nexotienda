@@ -150,7 +150,18 @@ else
   fi
 fi
 
-echo "══ 4/6 · Servicio ═══════════════════════════════════════════════"
+echo "══ 4/6 · Firewall ═══════════════════════════════════════════════"
+# Antes de arrancar el servicio a propósito: si el arranque falla, el puerto
+# igual queda abierto y no hay que acordarse de volver.
+if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+  ufw allow 53/udp  >/dev/null
+  ufw allow 53/tcp  >/dev/null
+  echo "  53/udp y 53/tcp abiertos"
+else
+  echo "  ufw inactivo, nada que hacer"
+fi
+
+echo "══ 5/6 · Servicio ═══════════════════════════════════════════════"
 cat > /etc/systemd/system/acme-dns.service <<'UNIT'
 [Unit]
 Description=acme-dns (solo sirve los TXT de validación de Let's Encrypt)
@@ -192,15 +203,6 @@ if ! dig @"$BIND_IP" +short SOA "$ACME_ZONE" +time=5 +tries=1 | grep -q .; then
   fail "acme-dns arrancó pero no contesta en ${BIND_IP}:53."
 fi
 echo "  activo y respondiendo · DNS en ${BIND_IP}:53 · API en 127.0.0.1:${API_PORT}"
-
-echo "══ 5/6 · Firewall ═══════════════════════════════════════════════"
-if command -v ufw >/dev/null && ufw status | grep -q "^Status: active"; then
-  ufw allow 53/udp  >/dev/null
-  ufw allow 53/tcp  >/dev/null
-  echo "  53/udp y 53/tcp abiertos"
-else
-  echo "  ufw inactivo, nada que hacer"
-fi
 
 echo "══ 6/6 · Registro de la cuenta ══════════════════════════════════"
 CREDS=/etc/acme-dns/registro.json
