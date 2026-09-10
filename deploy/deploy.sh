@@ -8,10 +8,20 @@
 # Corre en el MISMO VPS que NexoPOS y ClubPay, así que no toca nada de ellos:
 # usuario propio, puerto propio, y su propio archivo en sites-available.
 #
-# Uso, como root:
-#   sudo bash deploy.sh
+# LA PRIMERA VEZ el repo todavía no está en el servidor, así que hay que bajar
+# este script suelto. Son dos líneas:
 #
-# La primera vez, antes de correrlo, hacen falta dos cosas del lado del DNS:
+#   curl -fsSL -o /tmp/deploy-nexotienda.sh \
+#     https://raw.githubusercontent.com/napy77/nexotienda/main/deploy/deploy.sh
+#   sudo bash /tmp/deploy-nexotienda.sh
+#
+# (No hace falta crear /opt/nexotienda: el clone lo crea.)
+#
+# DE AHÍ EN MÁS el script ya vive en el repo:
+#
+#   sudo bash /opt/nexotienda/deploy/deploy.sh
+#
+# Antes de la primera corrida hacen falta dos cosas del lado del DNS:
 #   1) el registro comodín   *.nexotienda.app  A  <ip del VPS>
 #   2) el certificado        — ver deploy/README.md
 #
@@ -35,6 +45,7 @@ echo "══ 1/6 · Requisitos ════════════════�
 command -v git   >/dev/null || fail "Falta git."
 command -v nginx >/dev/null || fail "Falta nginx."
 command -v node  >/dev/null || fail "Falta Node.js."
+command -v curl  >/dev/null || fail "Falta curl (lo usa la comprobación final)."
 
 NODE_MAJOR=$(node -v | cut -d. -f1 | tr -d v)
 # Next 16 no arranca con menos de 20.9.

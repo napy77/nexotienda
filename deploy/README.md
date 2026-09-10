@@ -12,22 +12,35 @@ script no toca nada de ellos:
 
 El puerto 3100 es a propósito: el 3000 ya lo usa el frontend de NexoPOS.
 
-## Desplegar
+## La primera vez
+
+En el servidor todavía no hay nada, así que el script hay que bajarlo suelto. Dos
+líneas, y **no hace falta crear ningún directorio** — el clone crea `/opt/nexotienda`:
+
+```bash
+curl -fsSL -o /tmp/deploy-nexotienda.sh https://raw.githubusercontent.com/napy77/nexotienda/main/deploy/deploy.sh
+sudo bash /tmp/deploy-nexotienda.sh
+```
+
+Se baja a un archivo en vez de hacer `curl … | sudo bash` para poder leerlo antes de
+correrlo, y para que una descarga cortada por la mitad no se ejecute a medias.
+
+## De ahí en más
+
+Ya está el repo en el servidor, así que el script sale de ahí:
 
 ```bash
 sudo bash /opt/nexotienda/deploy/deploy.sh
 ```
 
-Idempotente: la primera vez clona, después hace `pull` y reconstruye. Si el build
+Idempotente: clona la primera vez, después hace `pull` y reconstruye. Si el build
 falla o el servicio no levanta, corta y muestra el log — no deja el sitio a medias.
 Y si la config de nginx no valida, **no recarga**, así que NexoPOS y ClubPay siguen
 andando.
 
-La primera vez, antes de correrlo, hacen falta las dos cosas de abajo.
-
 ---
 
-## 1. El comodín de DNS — obligatorio
+## 1. El comodín de DNS — hecho ✓
 
 Cada comercio es un subdominio (`supersol.nexotienda.app`) y cada pueblo también
 (`morrison.nexotienda.app`). Sin el comodín, ninguna tienda abre.
@@ -39,16 +52,16 @@ En el DNS de Linware, en la zona `nexotienda.app`:
 @    IN  A    181.111.252.198
 ```
 
-Hoy el `@` ya está; **el `*` falta**. Se verifica así:
+Ya está puesto. Se verifica así:
 
 ```bash
-dig +short cualquiercosa.nexotienda.app A     # tiene que devolver la IP
+dig +short cualquiercosa.nexotienda.app A     # → 181.111.252.198
 ```
 
 Con esto, un comercio nuevo no necesita ningún cambio de DNS: publica su tienda y
 su dirección funciona.
 
-## 2. El certificado
+## 2. El certificado — pendiente
 
 Acá está la única decisión de infraestructura, y conviene entenderla porque no es
 el `certbot --nginx` de siempre.

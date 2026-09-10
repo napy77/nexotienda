@@ -28,9 +28,14 @@ El ruteo es por subdominio, así que hay que entrar por uno:
 Corre en el mismo VPS que NexoPOS y ClubPay, en el puerto 3100 (el 3000 lo usa el
 frontend de NexoPOS).
 
+La primera vez, en el servidor:
+
 ```bash
-sudo bash /opt/nexotienda/deploy/deploy.sh
+curl -fsSL -o /tmp/deploy-nexotienda.sh https://raw.githubusercontent.com/napy77/nexotienda/main/deploy/deploy.sh
+sudo bash /tmp/deploy-nexotienda.sh
 ```
+
+Después, `sudo bash /opt/nexotienda/deploy/deploy.sh`.
 
 Antes de la primera vez hacen falta el comodín de DNS y el certificado:
 ver [deploy/README.md](deploy/README.md).
