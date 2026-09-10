@@ -28,8 +28,15 @@ VERSION=2.0.2
 DOMAIN=nexotienda.app
 ACME_ZONE="acme.${DOMAIN}"
 NS_NAME="acme-ns.${DOMAIN}"
-PUBLIC_IP=181.111.252.198
+PUBLIC_IP=181.111.252.198   # la que ve el mundo: va en los registros A
 API_PORT=8081
+
+# La IP a la que atarse es la que la máquina TIENE, que no es la misma: este VPS
+# está detrás de NAT y su interfaz tiene una IP privada. Atarse a la pública falla
+# con EADDRNOTAVAIL, y acme-dns en vez de decirlo se cuelga en un deadlock.
+BIND_IP=$(ip -4 -o addr show scope global 2>/dev/null \
+  | awk '{print $4}' | cut -d/ -f1 | head -1)
+[[ -n "$BIND_IP" ]] || BIND_IP=0.0.0.0
 
 if [[ $EUID -ne 0 ]]; then
   echo "Ejecutar como root: sudo bash $0" >&2
@@ -57,17 +64,19 @@ echo "══ 1/6 · El puerto 53 ═══════════════�
 # se ata solo a la IP pública, así que conviven. Lo que sí estorba es algo atado
 # a 0.0.0.0:53, a [::]:53 o a la IP pública, porque ahí sí chocan.
 CONFLICTO=$(ss -lntuHn 2>/dev/null \
-  | grep -E "(^|[[:space:]])(0\.0\.0\.0|\[::\]|${PUBLIC_IP//./\\.}):53([[:space:]]|$)" || true)
+  | grep -E "(^|[[:space:]])(0\.0\.0\.0|\[::\]|${BIND_IP//./\\.}):53([[:space:]]|$)" || true)
 
 if [[ -n "$CONFLICTO" ]] && ! systemctl is-active --quiet acme-dns; then
   echo "$CONFLICTO" >&2
   fail "Hay algo atado al puerto 53 en una dirección que necesitamos. Ver arriba."
 fi
 
-if ss -lntuHn 2>/dev/null | grep -q '127\.0\.0\.53:53'; then
-  echo "  systemd-resolved está en 127.0.0.53:53 — no molesta, nos atamos a ${PUBLIC_IP}"
-else
-  echo "  libre"
+if ss -lntuHn 2>/dev/null | grep -q '127\.0\.0\.5[34]:53'; then
+  echo "  systemd-resolved en loopback — no molesta"
+fi
+echo "  nos atamos a ${BIND_IP}:53"
+if [[ "$BIND_IP" != "$PUBLIC_IP" ]]; then
+  echo "  (la máquina está detrás de NAT: ${BIND_IP} adentro, ${PUBLIC_IP} afuera)"
 fi
 
 echo "══ 2/6 · Binario ════════════════════════════════════════════════"
@@ -91,9 +100,10 @@ echo "══ 3/6 · Configuración ═══════════════
 if [[ ! -f /etc/acme-dns/config.cfg ]]; then
   cat > /etc/acme-dns/config.cfg <<EOF
 [general]
-# Solo la IP pública: así convive con el systemd-resolved del sistema,
-# que se ata a 127.0.0.53:53. Atarse a 0.0.0.0 chocaría con él.
-listen = "${PUBLIC_IP}:53"
+# La IP de la interfaz, no la pública: la máquina está detrás de NAT y no tiene
+# la pública. Atarse a la de la interfaz además convive con el systemd-resolved
+# del sistema, que ocupa 127.0.0.53:53.
+listen = "${BIND_IP}:53"
 protocol = "both"
 domain = "${ACME_ZONE}"
 nsname = "${NS_NAME}"
@@ -158,11 +168,20 @@ systemctl daemon-reload
 systemctl enable --quiet acme-dns
 systemctl restart acme-dns
 sleep 3
-systemctl is-active --quiet acme-dns || {
-  journalctl -u acme-dns -n 30 --no-pager
-  fail "acme-dns no levantó. El log está arriba."
-}
-echo "  activo · DNS en :53 · API en 127.0.0.1:${API_PORT}"
+if ! systemctl is-active --quiet acme-dns; then
+  journalctl -u acme-dns -n 25 --no-pager
+  echo >&2
+  echo "Si el log dice 'deadlock', acme-dns se tragó un error de bind." >&2
+  echo "Comprobá que ${BIND_IP} sea una IP de esta máquina:" >&2
+  echo "  ip -4 -o addr show scope global" >&2
+  fail "acme-dns no levantó."
+fi
+
+# Que systemd lo dé por activo no prueba que conteste. Le preguntamos.
+if ! dig @"$BIND_IP" +short SOA "$ACME_ZONE" +time=5 +tries=1 | grep -q .; then
+  fail "acme-dns arrancó pero no contesta en ${BIND_IP}:53."
+fi
+echo "  activo y respondiendo · DNS en ${BIND_IP}:53 · API en 127.0.0.1:${API_PORT}"
 
 echo "══ 5/6 · Firewall ═══════════════════════════════════════════════"
 if command -v ufw >/dev/null && ufw status | grep -q "^Status: active"; then
