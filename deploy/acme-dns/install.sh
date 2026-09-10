@@ -127,6 +127,13 @@ ip = "127.0.0.1"
 port = "${API_PORT}"
 disable_registration = false
 tls = "none"
+# Estos tres no son opcionales aunque no los usemos: sin corsorigins la API acepta
+# la conexión y muere sin contestar ("Empty reply from server").
+corsorigins = [
+    "*"
+]
+use_header = false
+header_name = "X-Forwarded-For"
 
 [logconfig]
 loglevel = "info"
@@ -141,6 +148,13 @@ else
   # escucha, que se deriva de la máquina y no puede quedar congelada en un valor
   # viejo. Si no coincide, se corrige: dejarla mal hace que el daemon no arranque
   # y el motivo real quede tapado por un deadlock.
+  # Igual que con el listen: una config vieja a la que le falten campos deja el
+  # daemon andando pero con la API muerta, y el síntoma no señala la causa.
+  if ! grep -q corsorigins /etc/acme-dns/config.cfg; then
+    sed -i 's|^\[logconfig\]|corsorigins = [\n    "*"\n]\nuse_header = false\nheader_name = "X-Forwarded-For"\n\n[logconfig]|' \
+      /etc/acme-dns/config.cfg
+    echo "  config ya existía · agregados los campos de API que faltaban"
+  fi
   ACTUAL=$(grep -oP '^listen\s*=\s*"\K[^"]+' /etc/acme-dns/config.cfg || true)
   if [[ "$ACTUAL" != "${BIND_IP}:53" ]]; then
     sed -i "s|^listen = .*|listen = \"${BIND_IP}:53\"|" /etc/acme-dns/config.cfg
