@@ -66,136 +66,85 @@ su dirección funciona.
 Un solo certificado cubre `nexotienda.app` y **todos** los subdominios, presentes y
 futuros. Un comercio nuevo no necesita ni DNS ni certificado: publica y anda.
 
-Como un comodín solo se emite por **DNS-01** —el desafío donde Let's Encrypt pide un
-registro TXT— y el DNS de `nexotienda.app` lo servimos nosotros, la forma limpia es
-**RFC2136**: certbot pone y saca el TXT solo, por update dinámico, autenticándose con
-una clave TSIG.
+Un comodín solo se emite por **DNS-01** —el desafío donde Let's Encrypt pide un
+registro TXT—. El problema es que el DNS de `nexotienda.app` está detrás de un panel
+**Plesk sin acceso por shell**, así que no se puede automatizar poniendo el TXT ahí.
 
-> ### ⚠ Esto pasa en DOS máquinas distintas
->
-> | Máquina | Qué es | Pasos |
-> |---|---|---|
-> | **`104.248.13.36`** | El DNS primario (`ns2`), corre BIND | Paso 1 |
-> | **`181.111.252.198`** | El VPS de la app (`nexopos`) | Pasos 2 a 5 |
->
-> Es el error fácil de cometer: `tsig-keygen` y `/etc/bind/` **solo existen en el
-> DNS**. Si en el VPS de la app te dice `command not found`, no falta instalar
-> nada — estás en la máquina equivocada.
+La salida es **delegar**: le cedemos una subzona chiquita a un daemon nuestro, y el
+`_acme-challenge` del dominio real apunta ahí por CNAME.
 
-### De dónde sale la clave TSIG
+```
+Let's Encrypt pregunta por:   _acme-challenge.nexotienda.app   TXT
+   (en Plesk, estático)        └── CNAME →  <id>.acme.nexotienda.app
+   (delegado por NS)                        └── lo sirve acme-dns en el VPS
+```
 
-**No se saca de ningún lado: se genera.** Es un secreto compartido que se crea en el
-servidor DNS y se le copia a certbot. Nadie más lo emite.
+Lo que se gana, y es más de lo que parece:
 
-### Paso 1 · En el DNS primario — `ssh root@104.248.13.36`
+- **La credencial de certbot no puede tocar `nexotienda.app`.** Solo escribe TXT en
+  la subzona delegada. Si se filtra, el daño es un registro de validación. Con una
+  clave TSIG o una API key de Plesk el alcance sería la zona entera o el panel entero.
+- **Plesk se toca una sola vez.** Tres registros estáticos, y después ni para renovar
+  ni para dar de alta un comercio.
+- **La API de acme-dns nunca sale de localhost**, porque certbot corre en la misma
+  máquina.
 
-El primario es el que dice el SOA: **`ns2.nexotienda.app` = 104.248.13.36**, que corre
-BIND 9.18 sobre Ubuntu 24.04. Los updates dinámicos van al primario; cualquier otro
-los rechaza.
+### Paso 1 · Instalar acme-dns — en el VPS de la app
 
 ```bash
-# Si tsig-keygen no está (raro, viene con BIND):
-#   apt-get install -y bind9-utils
-
-# Generar la clave
-tsig-keygen -a HMAC-SHA512 certbot | tee /etc/bind/keys-certbot.conf
-chown root:bind /etc/bind/keys-certbot.conf
-chmod 640 /etc/bind/keys-certbot.conf
+sudo bash /opt/nexotienda/deploy/acme-dns/install.sh
 ```
 
-Sale algo así, y **ese `secret` es el que va en el ini de certbot**:
+Baja el binario, lo deja corriendo como servicio en el puerto 53 (verificado: está
+libre en ese VPS), registra la cuenta, y **te imprime los tres registros exactos**
+que hay que cargar en Plesk, con el id ya generado.
 
-```
-key "certbot" {
-    algorithm hmac-sha512;
-    secret "aBcD…muy largo…==";
-};
-```
+### Paso 2 · Los tres registros — en el panel de Plesk
 
-En `/etc/bind/named.conf.local`, incluir la clave y **darle permiso solo al TXT del
-desafío**:
+Los que imprimió el paso anterior, en la zona `nexotienda.app`:
 
-```
-include "/etc/bind/keys-certbot.conf";
+| Tipo | Nombre | Valor |
+|---|---|---|
+| A | `acme-ns.nexotienda.app` | `181.111.252.198` |
+| NS | `acme.nexotienda.app` | `acme-ns.nexotienda.app.` |
+| CNAME | `_acme-challenge.nexotienda.app` | `<lo que imprimió install.sh>` |
 
-zone "nexotienda.app" {
-    type master;
-    file "/var/lib/bind/nexotienda.app.zone";
-
-    // Solo ese nombre y solo TXT. Si la clave se filtra, el daño es un registro
-    // de validación, no la zona entera.
-    update-policy {
-        grant certbot name _acme-challenge.nexotienda.app. txt;
-    };
-};
-```
+Ojo con el CNAME: el valor es un id aleatorio que genera acme-dns al registrarse. Sale
+en la salida del paso 1 y también con:
 
 ```bash
-named-checkconf && rndc reload
+python3 -c "import json;print(json.load(open('/etc/acme-dns/registro.json'))['fulldomain'])"
 ```
 
-> **Ojo, esto cambia cómo se edita la zona.** Desde que acepta updates dinámicos,
-> BIND lleva un journal (`.jnl`) y **el archivo de zona no se edita más a mano** sin
-> congelarlo antes:
-> ```bash
-> rndc freeze nexotienda.app     # editar el archivo
-> rndc thaw   nexotienda.app     # vuelve a aceptar updates
-> ```
-> Si te olvidás del `freeze`, BIND pisa tus cambios con el journal. Vale la pena
-> saberlo antes que descubrirlo.
-
-### Paso 2 · En el VPS de la app — `181.111.252.198`
+Verificar que la delegación quedó bien antes de seguir:
 
 ```bash
-apt-get install -y python3-certbot-dns-rfc2136 bind9-dnsutils
-
-cat > /etc/letsencrypt/rfc2136.ini <<'EOF'
-dns_rfc2136_server = 104.248.13.36
-dns_rfc2136_port = 53
-dns_rfc2136_name = certbot.
-dns_rfc2136_secret = <el secret del paso 1>
-dns_rfc2136_algorithm = HMAC-SHA512
-EOF
-chmod 600 /etc/letsencrypt/rfc2136.ini
+dig +short NS acme.nexotienda.app                    # → acme-ns.nexotienda.app.
+dig +short CNAME _acme-challenge.nexotienda.app      # → <id>.acme.nexotienda.app.
 ```
 
-`dns_rfc2136_name` es el **nombre de la clave** (`certbot`, con el punto final), no un
-hostname. Es el error más común de este archivo.
-
-Antes de pedir el certificado conviene probar que el update llega. Copiá el archivo
-de la clave desde el DNS —o pegá el bloque a mano, es el mismo texto—:
-
-```bash
-scp root@104.248.13.36:/etc/bind/keys-certbot.conf /root/keys-certbot.conf
-
-nsupdate -k /root/keys-certbot.conf <<'EOF'
-server 104.248.13.36
-update add _acme-challenge.nexotienda.app. 60 TXT "prueba"
-send
-EOF
-dig @104.248.13.36 +short TXT _acme-challenge.nexotienda.app     # → "prueba"
-```
-
-Si eso anda, certbot va a andar. Si da `REFUSED`, es la `update-policy`; si da
-`NOTAUTH`, es la clave o el nombre de la clave.
+Si el NS no resuelve, Plesk todavía no propagó o el registro quedó mal. **No sigas**
+hasta que las dos consultas contesten: si emitís antes, quemás intentos contra el
+límite de Let's Encrypt.
 
 ### Paso 3 · Emitir — en el VPS de la app
 
 ```bash
 certbot certonly \
-  --dns-rfc2136 \
-  --dns-rfc2136-credentials /etc/letsencrypt/rfc2136.ini \
-  --dns-rfc2136-propagation-seconds 60 \
+  --manual --preferred-challenges dns \
+  --manual-auth-hook /etc/acme-dns/auth-hook.sh \
+  --non-interactive --agree-tos \
   -d nexotienda.app -d '*.nexotienda.app'
 ```
 
-Los 60 segundos de propagación son por los secundarios: Let's Encrypt puede consultar
-cualquiera de los tres NS, y si todavía no replicaron el TXT, falla.
+Antes te advertí que **no** usaras `--manual` porque no renueva solo. Esta es la
+excepción y la diferencia es el `--manual-auth-hook`: certbot lo guarda en la config
+de renovación y lo vuelve a ejecutar solo. Un `--manual` pelado, sin hook, sí queda
+manual para siempre.
 
 ### Paso 4 · Que nginx lo use — en el VPS de la app
 
-`certonly` emite el certificado pero **no toca nginx**. Hay que instalar la config con
-SSL y el hook que recarga después de cada renovación:
+`certonly` emite el certificado pero **no toca nginx**:
 
 ```bash
 cp /opt/nexotienda/deploy/nginx-nexotienda-ssl.conf /etc/nginx/sites-available/nexotienda
@@ -208,7 +157,7 @@ install -m 755 /opt/nexotienda/deploy/hooks/reload-nginx.sh \
 Sin el hook, certbot renueva y nginx sigue sirviendo el viejo hasta el próximo
 reload — y el día que venza se caen todas las tiendas juntas.
 
-### Paso 5 · Probar la renovación — en el VPS de la app
+### Paso 5 · Probar la renovación ahora, no en 60 días
 
 ```bash
 certbot renew --dry-run
@@ -216,24 +165,26 @@ certbot renew --dry-run
 
 Es el único momento en que te enterás de que algo está mal sin que se caiga nada.
 
----
-
 ### Si algo del comodín no sale
 
 Queda `agregar-host.sh` como salida de emergencia: emite un certificado con lista
-explícita de hosts y lo extiende comercio por comercio. Funciona y renueva solo, pero
-hay que correrlo en cada alta. Con el comodín andando no hace falta — el script lo
-detecta y avisa que ya está cubierto.
+explícita de hosts por HTTP-01, sin tocar el DNS. Funciona y renueva solo, pero hay
+que correrlo en cada alta de comercio.
 
 ```bash
 sudo bash /opt/nexotienda/deploy/agregar-host.sh panaderialaesquina
 ```
 
-### Nota sobre el tercer nameserver
+### Mantenimiento
 
-`ns3.nexotienda.app` (200.105.94.80) no contestó cuando lo consultamos desde acá. Si
-está caído o filtrado no rompe la emisión —alcanza con que respondan ns1 y ns2— pero
-conviene revisarlo, porque un NS que no contesta agrega latencia a cada consulta.
+acme-dns es un daemon más que tiene que estar vivo. Si se cae, la tienda **no** se
+cae — solo fallan las renovaciones, y de eso te enterás 30 días antes del
+vencimiento, no el día que pasa.
+
+```bash
+systemctl status acme-dns
+journalctl -u acme-dns -n 50
+```
 
 ## Después del deploy
 
