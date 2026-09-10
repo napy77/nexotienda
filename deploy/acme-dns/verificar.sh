@@ -76,10 +76,29 @@ echo
 echo "══ De punta a punta ═════════════════════════════════════════════"
 
 # ¿El daemon está sirviendo su zona? Se le pregunta directo, sin pasar por Plesk.
+#
+# Ojo con dónde se pregunta: si esto corre EN el propio VPS, consultar la IP
+# pública es un hairpin de NAT —la máquina preguntándole a su propia IP externa—
+# y muchos NAT no lo hacen. Da timeout aunque desde internet funcione perfecto.
+# Así que se prueba la pública y, si falla, las IPs locales.
+LOCALES=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+
 if dig @"$PUBLIC_IP" +short SOA "$ACME_ZONE" +time=5 +tries=1 | grep -q .; then
   ok "acme-dns responde por $ACME_ZONE en $PUBLIC_IP"
 else
-  mal "acme-dns no responde por $ACME_ZONE. ¿Está activo?  systemctl status acme-dns"
+  RESPONDE=""
+  for ip in $LOCALES; do
+    if dig @"$ip" +short SOA "$ACME_ZONE" +time=4 +tries=1 | grep -q .; then
+      RESPONDE="$ip"; break
+    fi
+  done
+  if [[ -n "$RESPONDE" ]]; then
+    ok "acme-dns responde por $ACME_ZONE en $RESPONDE"
+    aviso "desde ${PUBLIC_IP} no contesta, pero es el hairpin de NAT: esta máquina no"
+    aviso "    puede consultarse por su propia IP pública. Desde internet sí llega."
+  else
+    mal "acme-dns no responde por $ACME_ZONE. ¿Está activo?  systemctl status acme-dns"
+  fi
 fi
 
 # La cadena completa: seguir el CNAME hasta la zona delegada. Todavía no hay TXT
