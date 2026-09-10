@@ -53,21 +53,40 @@ Estas no son preferencias de estilo. Si una PR las cruza, se rechaza.
 - La receta existe solo como **calculadora de costo**; nunca mueve stock (D5).
 - Marcar "se acabó" tiene que costar **un gesto desde el teléfono** (D4).
 
+## Cómo se compra
+
+**El camino normal es anónimo.** Alguien entra a la tienda, pone dos paquetes de
+harina en el changuito y paga al recibirlos. Sin cuenta, sin ClubPay, sin
+identificarse — solo nombre y teléfono para que el comercio pueda avisarle. Esa va a
+ser la enorme mayoría de las ventas y el checkout tiene que tratarla como el default.
+
+La libreta es **lo excepcional**: se autoriza en el mostrador con el cliente presente
+y la persona la vincula desde ClubPay. Si eso no pasó, la opción **se ve grisada con
+su motivo** — no se esconde: esconderla no le enseña a nadie que existe.
+
 ## Cuenta corriente
 
 - El alta es **física**: se crea en NexoPOS, en el mostrador, con DNI (D23).
   La app nunca otorga crédito.
+- **El id es de la relación, no de la persona** (`accountId`). No existe ninguna
+  clave que identifique al comprador a través del pueblo: un id compartido entre
+  comercios les permitiría cruzar sus listas y descubrir que es el mismo cliente,
+  que es P3 por la puerta de atrás.
+- **`availableCents` puede ser `null`** = sin límite, que es el default y el caso más
+  común. `null` no es cero. Sin límite, la línea de disponible no se muestra.
 - **Funciona igual sin app** (D24). La vinculación es una capa que se enciende.
 - **El DNI enlaza, no revela** (D25): el match *propone*, el saldo aparece después de
   que el cliente confirma. El DNI no puede ser el identificador del sistema — para eso
   hay un `person_id` opaco.
 - El cierre **congela un período y emite un resumen** (D27). Fecha configurable por
-  comercio.
+  comercio. El `label` lo calcula NexoPOS y **se muestra tal cual**: si cierra el 10,
+  el período no es un mes y se llama "11/08 al 10/09".
 - No hay "una deuda": hay una **pila de períodos** (D28). El período abierto **nunca**
   se mezcla ni se suma con los resúmenes cerrados.
 - La ficha del cliente muestra **antigüedad, no un total** (D30).
-- Pago parcial permitido; se imputa del período más viejo al más nuevo, con override del
-  comerciante (D31).
+- El pago va **por importe libre contra la cuenta**, no contra un resumen elegido:
+  NexoPOS lo imputa del más viejo al más nuevo (D31). La imputación es del libro, no
+  de la vidriera.
 - Se muestra **"Disponible"**, nunca **"tu límite"** (D32).
 - **Límite por cliente es requisito de v1** (D33).
 - **Bloquear el fiado no bloquea la venta** (D35). El bloqueo online se comunica suave y
@@ -86,8 +105,11 @@ Estas no son preferencias de estilo. Si una PR las cruza, se rechaza.
 
 ## Integración con ClubPay
 
-- Handoff con **`person_id` opaco** + **token firmado, corto y de un solo uso**.
-  La API key se queda entre backends; **nunca** viaja al navegador.
+- Handoff con **token de un solo uso de dos minutos**, que se canja por el
+  `accountId` de esa relación. **Nunca un id en la URL**: un id permanente en un link
+  es una credencial que no vence nunca. Toda la resolución vive en `src/lib/session.ts`.
+- **Dos credenciales de API**, no una: la de plataforma para el subdominio y el
+  pueblo, la del comercio para su catálogo, sus cuentas y sus pedidos.
 - **Nunca** datos personales en query string.
 - El pago usa el Mercado Pago del propio comercio (modelo marketplace, split).
 - **Degradación sin Mercado Pago**: la cuenta corriente sigue funcionando; solo se pierde

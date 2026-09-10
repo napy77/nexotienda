@@ -3,37 +3,37 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { money } from '@/lib/format';
-import { payAccountPeriodAction } from '@/app/actions';
+import { payAccountAction } from '@/app/actions';
 
 /**
- * Pagar un resumen cerrado.
+ * Pagar contra la libreta, por un importe libre.
  *
- * Admite pago parcial (D31), porque el fiado de pueblo funciona con flexibilidad: si
- * la app solo acepta el total, es peor que el cuaderno.
+ * No se elige qué resumen se paga: se manda un monto y NexoPOS lo imputa del más
+ * viejo al más nuevo (D31). El pago parcial es requisito, no comodidad — el fiado de
+ * pueblo funciona con flexibilidad, y una app que solo acepta el total es peor que
+ * el cuaderno.
  */
-export function PayPeriod({
-  personId,
+export function PayAccount({
   storeId,
   storeSlug,
   storeName,
-  periodId,
-  pendingCents,
+  accountId,
+  owedCents,
 }: {
-  personId: string;
   storeId: string;
   storeSlug: string;
   storeName: string;
-  periodId: string;
-  pendingCents: number;
+  accountId: string;
+  owedCents: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pesos, setPesos] = useState(String(Math.round(pendingCents / 100)));
+  const [pesos, setPesos] = useState(String(Math.round(owedCents / 100)));
   const [error, setError] = useState<string | null>(null);
   const [busy, start] = useTransition();
 
   const amountCents = Math.round(Number(pesos.replace(/[^\d]/g, '')) * 100);
-  const partial = amountCents > 0 && amountCents < pendingCents;
+  const partial = amountCents > 0 && amountCents < owedCents;
 
   function pay() {
     setError(null);
@@ -41,17 +41,16 @@ export function PayPeriod({
       setError('Poné cuánto vas a pagar.');
       return;
     }
-    if (amountCents > pendingCents) {
-      setError(`No podés pagar más de ${money(pendingCents)}.`);
+    if (amountCents > owedCents) {
+      setError(`No podés pagar más de ${money(owedCents)}.`);
       return;
     }
     start(async () => {
-      const res = await payAccountPeriodAction({
-        personId,
+      const res = await payAccountAction({
         storeId,
         storeSlug,
         storeName,
-        periodId,
+        accountId,
         amountCents,
       });
       if (!res.ok) {
@@ -68,7 +67,7 @@ export function PayPeriod({
         onClick={() => setOpen(true)}
         className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700"
       >
-        Pagar {money(pendingCents)}
+        Pagar {money(owedCents)}
       </button>
     );
   }
@@ -107,7 +106,8 @@ export function PayPeriod({
 
       {partial && (
         <p className="mt-2 text-xs text-emerald-800">
-          Pagás una parte. Quedan {money(pendingCents - amountCents)} en este resumen.
+          Pagás una parte. Se imputa a lo más viejo primero; quedan{' '}
+          {money(owedCents - amountCents)}.
         </p>
       )}
       {error && <p className="mt-2 text-xs font-medium text-red-700">{error}</p>}

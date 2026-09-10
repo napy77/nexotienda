@@ -103,8 +103,17 @@ export interface Store {
   slots: FulfillmentSlot[];
   /** Mínimo para envío gratis, si el comercio lo configuró. */
   freeDeliveryOverCents?: number;
-  /** Si no tiene Mercado Pago, la cuenta corriente igual funciona; solo se cae el pago online. */
-  acceptsOnlinePayment: boolean;
+  /**
+   * Las formas de pago que este comercio acepta. NexoPOS no deja publicar una
+   * tienda sin al menos una, ni sin al menos un slot de entrega: una tienda así
+   * toma pedidos que después nadie puede cerrar, y el que queda mal con el vecino
+   * es el comerciante.
+   */
+  acceptedPayments: PaymentMethod[];
+  /** Obligatorios si acepta transferencia; sin esto el comprador no sabe dónde pagar. */
+  transferAlias?: string;
+  transferHolder?: string;
+  /** Da cuenta corriente en el mostrador. Distinto de habilitarla online (D34). */
   allowsCredit: boolean;
 }
 
@@ -116,14 +125,27 @@ export interface Store {
  * Un resumen es un período congelado (D27): un documento estable, pagable y
  * disputable. El período abierto es otra cosa y nunca se mezcla con estos (D28).
  */
-export interface AccountPeriod {
-  id: string;
+export interface AccountStatement {
+  /** NexoPOS lo llama `statement_id`: lo que la persona ve es un resumen. */
+  statementId: string;
+  /**
+   * Lo calcula NexoPOS y se muestra TAL CUAL. Si el comercio cierra el 10, el
+   * período no es ningún mes y el label es "11/08 al 10/09". Reescribirlo a nombre
+   * de mes sería mentir sobre qué abarca.
+   */
   label: string;
   status: 'abierto' | 'cerrado' | 'pagado_parcial' | 'pagado';
   closedAt?: string;
+  /** Solo en los cerrados. El abierto es lo que todavía está pasando. */
+  dueDate?: string;
   totalCents: number;
   paidCents: number;
-  entries: AccountEntry[];
+  /**
+   * Los movimientos. NexoPOS todavía no los anida en el listado: se piden aparte
+   * cuando la persona abre el resumen. Sin ellos un resumen es un número y no un
+   * documento, y no se puede disputar — que es la mitad de para qué existe (D27).
+   */
+  entries?: AccountEntry[];
 }
 
 export interface AccountEntry {
@@ -140,50 +162,67 @@ export interface AccountEntry {
 /**
  * La cuenta corriente de una persona CON UN COMERCIO.
  *
- * No existe una cuenta "del pueblo". Cada comercio es el acreedor de su propia
- * cuenta, con su fecha de cierre, su límite y su política (P1). Sumar las deudas de
- * dos comercios en un solo pagable nos convertiría en el acreedor, y además habría
- * que repartir un pago entre dos Mercado Pago distintos, que es justo lo que P1
- * prohíbe.
+ * No existe una cuenta "del pueblo", y tampoco existe una clave que identifique al
+ * comprador a través del pueblo: el `accountId` es de la RELACIÓN, distinto para la
+ * misma persona en cada comercio. Un id estable por persona compartido entre
+ * comercios les permitiría cruzar sus listas y descubrir que es el mismo cliente
+ * — que es justo lo que P3 prohíbe, entrando por la puerta de atrás.
  *
- * El total del pueblo existe, pero es una VISTA de solo lectura para el deudor
- * (P3) — ver `townDebtSummary`. Nunca es un objeto que se pueda pagar.
+ * El total del pueblo lo calcula ClubPay para mostrárselo al deudor, y nada más (P3).
  */
 export interface MerchantAccount {
+  /** Id de la relación persona–comercio. Solo existe si la vinculación fue aceptada. */
+  accountId: string;
   storeId: string;
   storeName: string;
   storeSlug: string;
-  /** Saldo disponible. Se muestra como "Disponible", nunca como "tu límite" (D32). */
-  availableCents: number;
+  /**
+   * Saldo disponible, o `null` cuando el comercio no le puso límite — que es el
+   * default y el caso más común, porque así funciona el cuaderno.
+   *
+   * `null` NO es cero: es exactamente al revés. Y tampoco se muestra como "sin
+   * límite", que suena a premio: cuando es `null`, la línea no se muestra.
+   *
+   * Cuando hay número se dice "Disponible: $18.000", nunca "Tu límite es $20.000"
+   * (D32). Mismo dato, dos objetos sociales distintos.
+   */
+  availableCents: number | null;
   /** Día del mes en que cierra este comercio. Configurable por comercio (D27). */
   closingDay: number;
   /** El comercio pausó el fiado. No bloquea la venta, solo el fiado (D35). */
   creditPaused: boolean;
-  /** Solo si el comercio habilitó compras a cuenta desde la tienda online (D34). */
+  /** Compras a cuenta desde la tienda online. Arranca APAGADO (D34). */
   onlineCreditEnabled: boolean;
   /** La pila. Del más viejo al más nuevo (D28, D30). */
-  periods: AccountPeriod[];
+  statements: AccountStatement[];
 }
 
-/** La vista agregada. Es del deudor y solo de él (P3). Nunca pagable. */
-export interface TownDebtSummary {
-  totalOwedCents: number;
-  merchantCount: number;
-}
-
-export interface Person {
-  /** Identificador opaco de Nexo. El DNI nunca es la clave del sistema (D25). */
-  personId: string;
-  firstName: string;
-  town?: string;
-  accounts: MerchantAccount[];
-}
+/**
+ * Por qué la opción de comprar en la libreta está grisada.
+ *
+ * Son cuatro situaciones distintas y cada una merece su mensaje: no es lo mismo no
+ * tener cuenta que tenerla pausada. Y en ningún caso se esconde el botón — se
+ * explica, con la puerta al humano al lado (D36).
+ */
+export type CreditBlockReason =
+  | 'sin_cuenta'
+  | 'solo_mostrador'
+  | 'pausada'
+  | 'sin_disponible';
 
 // ---------------------------------------------------------------------------
 // Pedido
 // ---------------------------------------------------------------------------
 
-export type PaymentMethod = 'cuenta_corriente' | 'online' | 'efectivo_entrega';
+export type PaymentMethod =
+  /** El camino normal: comprás y pagás cuando lo recibís o lo retirás. */
+  | 'efectivo_entrega'
+  /** ClubPay, tarjeta. Va por el rail de Mercado Pago del comercio. */
+  | 'online'
+  /** Transferencia al alias del comercio. Requiere alias y titular en el `Store`. */
+  | 'transferencia'
+  /** Solo si hay cuenta autorizada en el mostrador y habilitada online (D23, D34). */
+  | 'cuenta_corriente';
 
 /**
  * Estado del cobro, que es otra cosa que el estado del pedido.
@@ -212,6 +251,9 @@ export interface OrderLine {
 
 export interface Order {
   code: string;
+  /** Ausente en la compra anónima, que es el camino normal. */
+  accountId?: string;
+  contact?: { name: string; phone: string };
   storeId: string;
   storeName: string;
   storeSlug: string;
@@ -242,7 +284,13 @@ export interface NewOrder {
   address?: string;
   paymentMethod: PaymentMethod;
   notes?: string;
-  personId?: string;
+  /**
+   * Solo cuando la compra va a la libreta. El camino normal es anónimo: alguien
+   * entra, compra dos paquetes de harina y paga al recibirlos.
+   */
+  accountId?: string;
+  /** Para poder avisarle del pedido a quien compró sin cuenta. */
+  contact?: { name: string; phone: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -268,35 +316,57 @@ export interface TownSearchResult {
 // El puerto. Cualquier adapter (fixtures o API real) implementa esto.
 // ---------------------------------------------------------------------------
 
+/**
+ * El puerto. Cualquier adapter (fixtures o API real) implementa esto.
+ *
+ * Dos credenciales, no una: los endpoints de plataforma (resolver un subdominio,
+ * el pueblo) no tienen otra credencial posible; los del comercio —su catálogo, su
+ * stock, las cuentas de sus clientes, sus pedidos— van con la clave de ESE
+ * comercio. Una clave de plataforma que puede leer y escribir la cuenta corriente
+ * de cualquier comercio concentra un daño del tamaño del ecosistema entero.
+ */
 export interface NexoPosPort {
-  /** Resuelve un subdominio: puede ser un comercio o un pueblo. */
+  // --- plataforma ---
   resolveHost(sub: string): Promise<
     { kind: 'store'; store: Store } | { kind: 'town'; townSlug: string; name: string } | null
   >;
+  listTownStores(townSlug: string): Promise<Store[]>;
+  searchTown(townSlug: string, query: string): Promise<TownSearchResult>;
+
+  // --- del comercio ---
   getStore(slug: string): Promise<Store | null>;
   listPasillos(storeId: string): Promise<Pasillo[]>;
   listProducts(storeId: string): Promise<Product[]>;
   getProduct(storeId: string, productId: string): Promise<Product | null>;
 
-  listTownStores(townSlug: string): Promise<Store[]>;
-  searchTown(townSlug: string, query: string): Promise<TownSearchResult>;
-
-  getPerson(personId: string): Promise<Person | null>;
-  getAccount(personId: string, storeId: string): Promise<MerchantAccount | null>;
+  /**
+   * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.
+   *
+   * No existe "todas las cuentas de esta persona": ese mapa vive en ClubPay, que es
+   * el único que sabe que el Juan del almacén y el de la ferretería son el mismo.
+   */
+  getAccount(storeId: string, accountId: string): Promise<MerchantAccount | null>;
+  /** Los movimientos de un resumen. Se piden cuando la persona lo abre. */
+  getStatementEntries(
+    storeId: string,
+    accountId: string,
+    statementId: string,
+  ): Promise<AccountEntry[]>;
 
   createOrder(order: NewOrder): Promise<Order>;
   getOrder(code: string): Promise<Order | null>;
-  /** El cobro se acreditó: el pedido queda pagado. */
   confirmOrderPayment(code: string, paymentId: string): Promise<Order | null>;
 
   /**
-   * Registra un pago contra un resumen del comercio. Admite pago parcial y se imputa
-   * del período más viejo al más nuevo (D31).
+   * Un pago contra la cuenta, por un importe libre.
+   *
+   * NexoTienda NO elige qué resumen se paga: manda un monto y NexoPOS lo imputa del
+   * más viejo al más nuevo, con lo que sobre a cuenta del período abierto (D31). La
+   * imputación es del libro, no de la vidriera.
    */
   registerAccountPayment(input: {
-    personId: string;
     storeId: string;
-    periodId: string;
+    accountId: string;
     amountCents: number;
     paymentId: string;
   }): Promise<MerchantAccount | null>;

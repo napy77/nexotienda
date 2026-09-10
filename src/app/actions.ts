@@ -45,7 +45,6 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
       amountCents: order.totalCents,
       description: `Pedido ${order.code} en ${order.storeName}`,
       returnUrl: `/s/${order.storeSlug}/pedido/${order.code}`,
-      personId: input.personId,
     });
     return { ok: true, code: order.code, checkoutUrl: intent.checkoutUrl };
   } catch (e) {
@@ -58,13 +57,18 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
   }
 }
 
-/** Cobrar un resumen cerrado de la libreta. Admite monto parcial (D31). */
-export async function payAccountPeriodAction(input: {
-  personId: string;
+/**
+ * Cobrar contra la libreta, por un importe libre (D31).
+ *
+ * NexoTienda no elige qué resumen se paga: manda un monto y NexoPOS lo imputa del
+ * más viejo al más nuevo, con lo que sobre a cuenta del período abierto. La
+ * imputación es del libro, no de la vidriera.
+ */
+export async function payAccountAction(input: {
   storeId: string;
   storeSlug: string;
   storeName: string;
-  periodId: string;
+  accountId: string;
   amountCents: number;
 }): Promise<{ ok: true; checkoutUrl: string } | { ok: false; error: string }> {
   if (input.amountCents <= 0) {
@@ -73,12 +77,12 @@ export async function payAccountPeriodAction(input: {
   try {
     const intent = await payments.createIntent({
       kind: 'resumen',
-      reference: `${input.storeId}|${input.periodId}|${input.personId}`,
+      reference: `${input.storeId}|${input.accountId}`,
       storeId: input.storeId,
       storeSlug: input.storeSlug,
       storeName: input.storeName,
       amountCents: input.amountCents,
-      description: `Resumen de ${input.storeName}`,
+      description: `Libreta de ${input.storeName}`,
       returnUrl: `/s/${input.storeSlug}/libreta`,
     });
     return { ok: true, checkoutUrl: intent.checkoutUrl };
@@ -111,11 +115,10 @@ export async function settlePaymentAction(
     if (intent.kind === 'orden') {
       await nexopos.confirmOrderPayment(intent.reference, intent.id);
     } else {
-      const [storeId, periodId, personId] = intent.reference.split('|');
+      const [storeId, accountId] = intent.reference.split('|');
       await nexopos.registerAccountPayment({
-        personId,
         storeId,
-        periodId,
+        accountId,
         amountCents: intent.amountCents,
         paymentId: intent.id,
       });

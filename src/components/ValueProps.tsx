@@ -68,10 +68,13 @@ export function ValueProps({
               {account ? 'Tu libreta con este comercio' : 'Acá se puede comprar en la libreta'}
             </h4>
             <p className="mt-0.5 text-xs text-neutral-600">
-              {account
-                ? // "Disponible", nunca "tu límite" (D32).
-                  `Disponible ${money(account.availableCents)}. Cierra el ${account.closingDay}.`
-                : 'El fiado de siempre, anotado y a la vista. Se abre en el mostrador.'}
+              {!account
+                ? 'El fiado de siempre, anotado y a la vista. Se abre en el mostrador.'
+                : account.availableCents !== null
+                  ? // "Disponible", nunca "tu límite" (D32). Sin límite no se muestra:
+                    // "sin límite" suena a premio y es solo cómo funciona el cuaderno.
+                    `Disponible ${money(account.availableCents)}. Cierra el ${account.closingDay}.`
+                  : `Cierra el ${account.closingDay} de cada mes.`}
             </p>
           </div>
         </Link>

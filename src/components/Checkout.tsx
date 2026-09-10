@@ -3,19 +3,47 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { Banknote, BookMarked, CreditCard, Landmark, Minus, Plus, Trash2 } from 'lucide-react';
 import { money } from '@/lib/format';
+import { creditState } from '@/lib/credit';
 import type { MerchantAccount, PaymentMethod, Store } from '@/lib/nexopos/types';
 import { placeOrderAction } from '@/app/actions';
 import { useCart } from './CartProvider';
 import { ContactButton } from './StoreShell';
 
+const PAYMENT_UI: Record<
+  PaymentMethod,
+  { label: string; hint: string; icon: typeof Banknote }
+> = {
+  efectivo_entrega: {
+    label: 'Al recibirlo o retirarlo',
+    hint: 'Pagás en mano, sin nada más',
+    icon: Banknote,
+  },
+  online: {
+    label: 'Pagar ahora',
+    hint: 'Con ClubPay, tarjeta o transferencia',
+    icon: CreditCard,
+  },
+  transferencia: {
+    label: 'Transferencia',
+    hint: 'Te pasamos el alias del comercio',
+    icon: Landmark,
+  },
+  cuenta_corriente: {
+    label: 'Anotar en la libreta',
+    hint: '',
+    icon: BookMarked,
+  },
+};
+
 export function Checkout({ store, account }: { store: Store; account: MerchantAccount | null }) {
   const cart = useCart();
   const router = useRouter();
   const [slotId, setSlotId] = useState(store.slots[0]?.id ?? 'retiro');
-  const [payment, setPayment] = useState<PaymentMethod>('efectivo_entrega');
   const [address, setAddress] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -25,11 +53,13 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
   const feeCents = slot?.kind === 'reparto' && !freeShipping ? (slot.feeCents ?? 0) : 0;
   const totalCents = cart.subtotalCents + feeCents;
 
-  // El fiado desde la tienda online necesita tres cosas: que el comercio dé cuenta
-  // corriente, que la haya habilitado online (D34), y que no la haya pausado (D35).
-  const creditAvailable =
-    !!account && account.onlineCreditEnabled && !account.creditPaused;
-  const overLimit = !!account && totalCents > account.availableCents;
+  const credit = creditState(store, account, totalCents);
+
+  // El default es el camino normal: comprar y pagar al recibirlo. La libreta nunca
+  // viene preseleccionada.
+  const methods = store.acceptedPayments.filter((m) => m !== 'cuenta_corriente');
+  const [payment, setPayment] = useState<PaymentMethod>(methods[0] ?? 'efectivo_entrega');
+  const showCredit = store.acceptedPayments.includes('cuenta_corriente');
 
   if (cart.ready && cart.lines.length === 0) {
     return (
@@ -51,6 +81,11 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
       setError('Necesitamos la dirección para llevártelo.');
       return;
     }
+    // Sin cuenta no sabemos quién sos, y el comercio necesita poder avisarte.
+    if (!account && (name.trim().length < 2 || phone.trim().length < 6)) {
+      setError('Dejanos tu nombre y un teléfono para poder avisarte.');
+      return;
+    }
     start(async () => {
       const res = await placeOrderAction({
         storeId: store.id,
@@ -58,14 +93,14 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         slotId,
         address: slot?.kind === 'reparto' ? address.trim() : undefined,
         paymentMethod: payment,
-        personId: account ? 'per_7f3a91c2' : undefined,
+        accountId: payment === 'cuenta_corriente' ? account?.accountId : undefined,
+        contact: account ? undefined : { name: name.trim(), phone: phone.trim() },
       });
       if (!res.ok) {
         setError(res.error);
         return;
       }
       cart.clear();
-      // Si hay que cobrar, primero el cobro; el pedido ya quedó hecho igual.
       router.push(res.checkoutUrl ?? `/s/${store.slug}/pedido/${res.code}`);
     });
   }
@@ -145,8 +180,7 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
                   <span className="block text-sm font-semibold text-neutral-900">{s.label}</span>
                   <span className="block text-xs text-neutral-500">
                     {s.kind === 'retiro'
-                      ? // El tiempo lo declara el comercio al aceptar, no lo promete la
-                        // plataforma (D18, D20).
+                      ? // El tiempo lo declara el comercio al aceptar (D18, D20).
                         'Te avisamos cuando esté listo'
                       : freeShipping
                         ? 'Envío sin cargo'
@@ -167,78 +201,117 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
           )}
         </div>
 
+        {!account && (
+          <div className="rounded-xl border border-neutral-200 bg-white p-4">
+            <h2 className="mb-1 text-sm font-bold text-neutral-900">¿Quién sos?</h2>
+            <p className="mb-3 text-xs text-neutral-500">
+              Para que {store.name} pueda avisarte cuando esté listo.
+            </p>
+            <div className="space-y-2">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Tu nombre"
+                autoComplete="name"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Teléfono"
+                inputMode="tel"
+                autoComplete="tel"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-bold text-neutral-900">¿Cómo pagás?</h2>
           <div className="space-y-2">
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 p-3">
-              <input
-                type="radio"
-                name="pay"
-                checked={payment === 'efectivo_entrega'}
-                onChange={() => setPayment('efectivo_entrega')}
-              />
-              <span className="text-sm font-semibold text-neutral-900">
-                Efectivo al recibir o retirar
-              </span>
-            </label>
-
-            {store.acceptsOnlinePayment && (
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 p-3">
-                <input
-                  type="radio"
-                  name="pay"
-                  checked={payment === 'online'}
-                  onChange={() => setPayment('online')}
-                />
-                <span className="flex-1">
-                  <span className="block text-sm font-semibold text-neutral-900">
-                    Pagar ahora
+            {methods.map((m) => {
+              const ui = PAYMENT_UI[m];
+              const Icon = ui.icon;
+              return (
+                <label
+                  key={m}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 ${
+                    payment === m ? 'border-blue-500 bg-blue-50' : 'border-neutral-200'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="pay"
+                    checked={payment === m}
+                    onChange={() => setPayment(m)}
+                    className="mt-0.5"
+                  />
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
+                  <span className="flex-1">
+                    <span className="block text-sm font-semibold text-neutral-900">
+                      {ui.label}
+                    </span>
+                    <span className="block text-xs text-neutral-500">
+                      {m === 'transferencia' && store.transferAlias
+                        ? `Alias ${store.transferAlias}`
+                        : ui.hint}
+                    </span>
                   </span>
-                  <span className="block text-xs text-neutral-500">
-                    Con ClubPay, tarjeta o transferencia
-                  </span>
-                </span>
-              </label>
-            )}
+                </label>
+              );
+            })}
 
-            {account && (
+            {/*
+              La libreta se muestra siempre que el comercio la tome — grisada cuando
+              no se puede, con el motivo. Esconderla no le enseña a nadie que existe.
+            */}
+            {showCredit && (
               <label
                 className={`flex items-start gap-2 rounded-lg border p-3 ${
-                  creditAvailable && !overLimit
-                    ? 'cursor-pointer border-neutral-200'
-                    : 'border-neutral-200 bg-neutral-50'
+                  !credit.ok
+                    ? 'border-neutral-200 bg-neutral-50'
+                    : payment === 'cuenta_corriente'
+                      ? 'cursor-pointer border-blue-500 bg-blue-50'
+                      : 'cursor-pointer border-neutral-200'
                 }`}
               >
                 <input
                   type="radio"
                   name="pay"
-                  disabled={!creditAvailable || overLimit}
+                  disabled={!credit.ok}
                   checked={payment === 'cuenta_corriente'}
                   onChange={() => setPayment('cuenta_corriente')}
                   className="mt-0.5"
                 />
+                <BookMarked
+                  className={`mt-0.5 h-4 w-4 shrink-0 ${
+                    credit.ok ? 'text-emerald-600' : 'text-neutral-400'
+                  }`}
+                />
                 <span className="flex-1">
-                  <span className="block text-sm font-semibold text-neutral-900">
+                  <span
+                    className={`block text-sm font-semibold ${
+                      credit.ok ? 'text-neutral-900' : 'text-neutral-500'
+                    }`}
+                  >
                     Anotar en la libreta
                   </span>
-                  {/* "Disponible", nunca "tu límite" (D32). */}
-                  <span className="block text-xs text-neutral-500">
-                    Disponible: {money(account.availableCents)}
-                  </span>
-                  {account.creditPaused && (
-                    // El bloqueo se comunica suave y deja salida a un humano (D36).
-                    <span className="mt-1 block text-xs text-neutral-600">
-                      Para seguir comprando en la libreta, hablá con {store.name}.
-                    </span>
-                  )}
-                  {!account.creditPaused && !account.onlineCreditEnabled && (
-                    <span className="mt-1 block text-xs text-neutral-600">
-                      {store.name} toma la libreta solo en el mostrador.
-                    </span>
-                  )}
-                  {creditAvailable && overLimit && (
-                    <span className="mt-1 block text-xs text-neutral-600">
-                      Este pedido supera tu disponible. Podés pagarlo de otra forma.
+                  {credit.ok ? (
+                    account && account.availableCents !== null ? (
+                      // "Disponible", nunca "tu límite" (D32). Sin límite no se
+                      // muestra la línea: "sin límite" suena a premio.
+                      <span className="block text-xs text-neutral-500">
+                        Disponible: {money(account.availableCents)}
+                      </span>
+                    ) : (
+                      <span className="block text-xs text-neutral-500">
+                        Lo pagás en el cierre, como siempre
+                      </span>
+                    )
+                  ) : (
+                    <span className="mt-0.5 block text-xs text-neutral-600">
+                      {credit.message}
                     </span>
                   )}
                 </span>
@@ -246,7 +319,7 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
             )}
           </div>
 
-          {account?.creditPaused && (
+          {!credit.ok && credit.offerContact && (
             <div className="mt-3">
               <ContactButton store={store} className="w-full justify-center" />
             </div>

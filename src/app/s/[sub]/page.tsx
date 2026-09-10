@@ -2,14 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
+import { getAccountId } from '@/lib/session';
 import { Catalog } from '@/components/Catalog';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { StoreHero } from '@/components/StoreHero';
 import { TownSearch } from '@/components/TownSearch';
 import { ValueProps } from '@/components/ValueProps';
-
-/** Mientras no exista el handoff desde ClubPay, la persona de prueba es fija. */
-const DEMO_PERSON = 'per_7f3a91c2';
 
 /** Foto de portada por comercio. Cuando NexoPOS la exponga, sale del `Store`. */
 const COVERS: Record<string, string> = {
@@ -99,10 +97,11 @@ export default async function SubdomainPage({ params }: Props) {
     );
   }
 
+  const accountId = await getAccountId(store.slug);
   const [pasillos, products, account] = await Promise.all([
     nexopos.listPasillos(store.id),
     nexopos.listProducts(store.id),
-    nexopos.getAccount(DEMO_PERSON, store.id),
+    accountId ? nexopos.getAccount(store.id, accountId) : Promise.resolve(null),
   ]);
 
   return (

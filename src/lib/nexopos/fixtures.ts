@@ -10,13 +10,13 @@ import {
   STORES_MORRISON,
 } from './fixtures.data';
 import type {
+  AccountEntry,
   Availability,
   MerchantAccount,
   NewOrder,
   NexoPosPort,
   Order,
   Pasillo,
-  Person,
   Product,
   Store,
   TownSearchResult,
@@ -102,7 +102,16 @@ function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
         : []),
     ],
     freeDeliveryOverCents: s.hasDelivery ? money(35000) : undefined,
-    acceptsOnlinePayment: true,
+    // El comerciante las elige en el POS; no se puede publicar sin al menos una.
+    // La libreta solo aparece si este comercio la da (Doña Rosa no fía).
+    acceptedPayments: [
+      'efectivo_entrega',
+      'online',
+      'transferencia',
+      ...(s.allowsCredit ? (['cuenta_corriente'] as const) : []),
+    ],
+    transferAlias: `${SLUGS[s.id] ?? s.id}.morrison.mp`,
+    transferHolder: s.name,
     allowsCredit: s.allowsCredit,
   };
 }
@@ -123,7 +132,8 @@ const jureHnos: Store = {
   verified: true,
   storefrontPublished: false,
   slots: [{ id: 'retiro', label: 'Retirar en el local', kind: 'retiro' }],
-  acceptsOnlinePayment: false,
+  // Sin Mercado Pago: la libreta sigue funcionando, solo se cae el pago online.
+  acceptedPayments: ['efectivo_entrega', 'cuenta_corriente'],
   allowsCredit: true,
 };
 
@@ -138,6 +148,9 @@ const products = INITIAL_PRODUCTS.map(mapProduct);
  */
 const accounts: MerchantAccount[] = [
   {
+    // Id de la RELACIÓN, no de la persona. En Jure Hnos. es otro distinto, y no hay
+    // forma de saber desde acá que son el mismo ser humano — eso solo lo sabe ClubPay.
+    accountId: 'acc_sol_4b91',
     storeId: 'store-supersol',
     storeName: 'Súper SOL',
     storeSlug: 'supersol',
@@ -145,61 +158,63 @@ const accounts: MerchantAccount[] = [
     closingDay: 10,
     creditPaused: false,
     onlineCreditEnabled: true,
-    periods: [
+    statements: [
       {
-        id: 'supersol-2026-08',
-        label: 'Agosto 2026',
+        statementId: 'st_sol_2608',
+        // Cierra el 10, así que el período NO es un mes. El label lo calcula NexoPOS
+        // y se muestra tal cual: llamarlo "agosto" sería mentir sobre qué abarca.
+        label: '11/07 al 10/08',
         status: 'cerrado',
         closedAt: '2026-08-10',
+        dueDate: '2026-08-20',
         totalCents: money(33100),
         paidCents: 0,
-        entries: [
-          { id: 'e1', date: '2026-08-02', description: 'Compra en el mostrador', amountCents: money(18400), receipt: '#1042', origin: 'mostrador' },
-          { id: 'e2', date: '2026-08-09', description: 'Compra en el mostrador', amountCents: money(14700), receipt: '#1105', origin: 'mostrador' },
-        ],
       },
       {
-        id: 'supersol-2026-09',
-        label: 'Septiembre 2026',
+        statementId: 'st_sol_2609',
+        label: '11/08 al 10/09',
         status: 'abierto',
         totalCents: money(14200),
         paidCents: 0,
-        entries: [
-          { id: 'e3', date: '2026-09-02', description: 'Carnicería y lácteos', amountCents: money(8400), receipt: '#1289', origin: 'mostrador' },
-          { id: 'e4', date: '2026-09-05', description: 'Despensa', amountCents: money(5800), receipt: '#1340', origin: 'tienda' },
-        ],
       },
     ],
   },
   {
+    accountId: 'acc_jure_7d20',
     storeId: 'store-jurehnos',
     storeName: 'Jure Hnos.',
     storeSlug: 'jure',
-    availableCents: money(40000),
-    // Cierra el 5, no el 10: cada comercio pone su fecha (D27).
+    // Sin límite: es el default y el caso más común. No es cero, es al revés.
+    availableCents: null,
     closingDay: 5,
     creditPaused: false,
+    // Arranca apagado: toma la libreta solo en el mostrador (D34).
     onlineCreditEnabled: false,
-    periods: [
+    statements: [
       {
-        id: 'jure-2026-09',
-        label: 'Septiembre 2026',
+        statementId: 'st_jure_2609',
+        label: '06/08 al 05/09',
         status: 'abierto',
         totalCents: money(9200),
         paidCents: 0,
-        entries: [
-          { id: 'e5', date: '2026-09-04', description: 'Corralón — bolsas de cemento', amountCents: money(9200), receipt: '#0412', origin: 'mostrador' },
-        ],
       },
     ],
   },
 ];
 
-const person: Person = {
-  personId: 'per_7f3a91c2',
-  firstName: 'Germán',
-  town: TOWN.name,
-  accounts,
+/** Los movimientos viven aparte: NexoPOS no los anida en el listado de resúmenes. */
+const entriesByStatement: Record<string, AccountEntry[]> = {
+  st_sol_2608: [
+    { id: 'e1', date: '2026-08-02', description: 'Compra en el mostrador', amountCents: money(18400), receipt: '#1042', origin: 'mostrador' },
+    { id: 'e2', date: '2026-08-09', description: 'Compra en el mostrador', amountCents: money(14700), receipt: '#1105', origin: 'mostrador' },
+  ],
+  st_sol_2609: [
+    { id: 'e3', date: '2026-09-02', description: 'Carnicería y lácteos', amountCents: money(8400), receipt: '#1289', origin: 'mostrador' },
+    { id: 'e4', date: '2026-09-05', description: 'Despensa', amountCents: money(5800), receipt: '#1340', origin: 'tienda' },
+  ],
+  st_jure_2609: [
+    { id: 'e5', date: '2026-09-04', description: 'Corralón — bolsas de cemento', amountCents: money(9200), receipt: '#0412', origin: 'mostrador' },
+  ],
 };
 
 const orders = new Map<string, Order>();
@@ -262,13 +277,14 @@ export const fixtures: NexoPosPort = {
     return { query, hits, exhaustive: false } as TownSearchResult;
   },
 
-  async getPerson(personId) {
-    return personId === person.personId ? person : null;
+  async getAccount(storeId, accountId) {
+    return accounts.find((a) => a.storeId === storeId && a.accountId === accountId) ?? null;
   },
 
-  async getAccount(personId, storeId) {
-    if (personId !== person.personId) return null;
-    return accounts.find((a) => a.storeId === storeId) ?? null;
+  async getStatementEntries(storeId, accountId, statementId) {
+    const account = accounts.find((a) => a.storeId === storeId && a.accountId === accountId);
+    if (!account?.statements.some((st) => st.statementId === statementId)) return [];
+    return entriesByStatement[statementId] ?? [];
   },
 
   async createOrder(input: NewOrder) {
@@ -308,6 +324,8 @@ export const fixtures: NexoPosPort = {
       slotLabel: slot.label,
       slotKind: slot.kind,
       address: input.address,
+      accountId: input.accountId,
+      contact: input.contact,
       paymentMethod: input.paymentMethod,
       // El fiado no es un pago: es una anotación que se cobra en el cierre (D27).
       // El efectivo tampoco pasa por acá. Solo el rail online queda pendiente.
@@ -332,22 +350,32 @@ export const fixtures: NexoPosPort = {
     return next;
   },
 
-  async registerAccountPayment({ personId, storeId, periodId, amountCents }) {
-    if (personId !== person.personId) return null;
-    const account = accounts.find((a) => a.storeId === storeId);
+  async registerAccountPayment({ storeId, accountId, amountCents }) {
+    const account = accounts.find((a) => a.storeId === storeId && a.accountId === accountId);
     if (!account) return null;
 
-    const period = account.periods.find((p) => p.id === periodId);
-    if (!period) return null;
-
-    // Pago parcial permitido (D31). Lo que sobra de este período quedaría para
-    // imputar al siguiente más viejo; con un solo período cerrado no aplica todavía.
-    const paid = Math.min(period.paidCents + amountCents, period.totalCents);
-    period.paidCents = paid;
-    period.status = paid >= period.totalCents ? 'pagado' : 'pagado_parcial';
+    // Importe libre. Se imputa del resumen cerrado más viejo al más nuevo, y lo que
+    // sobra queda a cuenta del período abierto: la plata no queda colgada (D31).
+    let left = amountCents;
+    for (const st of account.statements) {
+      if (left <= 0) break;
+      if (st.status === 'abierto' || st.status === 'pagado') continue;
+      const owed = st.totalCents - st.paidCents;
+      const applied = Math.min(owed, left);
+      st.paidCents += applied;
+      st.status = st.paidCents >= st.totalCents ? 'pagado' : 'pagado_parcial';
+      left -= applied;
+    }
+    if (left > 0) {
+      const open = account.statements.find((st) => st.status === 'abierto');
+      if (open) open.paidCents += left;
+    }
 
     // Pagar libera disponible en ESE comercio, que es el único acreedor (P1).
-    account.availableCents += amountCents;
+    // Si no tiene límite, no hay disponible que mover.
+    if (account.availableCents !== null) {
+      account.availableCents += amountCents;
+    }
     return account;
   },
 };

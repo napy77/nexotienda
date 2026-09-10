@@ -1,17 +1,17 @@
 import { notFound } from 'next/navigation';
 import { nexopos } from '@/lib/nexopos';
+import { getAccountId } from '@/lib/session';
 import { Checkout } from '@/components/Checkout';
 import { StoreShell } from '@/components/StoreShell';
-
-/** Mientras no exista el handoff desde ClubPay, la persona de prueba es fija. */
-const DEMO_PERSON = 'per_7f3a91c2';
 
 export default async function CarritoPage({ params }: { params: Promise<{ sub: string }> }) {
   const { sub } = await params;
   const store = await nexopos.getStore(sub);
   if (!store) notFound();
 
-  const account = await nexopos.getAccount(DEMO_PERSON, store.id);
+  // Lo normal es no tener cuenta: se compra y se paga, sin identificarse.
+  const accountId = await getAccountId(store.slug);
+  const account = accountId ? await nexopos.getAccount(store.id, accountId) : null;
 
   return (
     <StoreShell store={store}>
