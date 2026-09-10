@@ -71,18 +71,32 @@ registro TXT— y el DNS de `nexotienda.app` lo servimos nosotros, la forma limp
 **RFC2136**: certbot pone y saca el TXT solo, por update dinámico, autenticándose con
 una clave TSIG.
 
+> ### ⚠ Esto pasa en DOS máquinas distintas
+>
+> | Máquina | Qué es | Pasos |
+> |---|---|---|
+> | **`104.248.13.36`** | El DNS primario (`ns2`), corre BIND | Paso 1 |
+> | **`181.111.252.198`** | El VPS de la app (`nexopos`) | Pasos 2 a 5 |
+>
+> Es el error fácil de cometer: `tsig-keygen` y `/etc/bind/` **solo existen en el
+> DNS**. Si en el VPS de la app te dice `command not found`, no falta instalar
+> nada — estás en la máquina equivocada.
+
 ### De dónde sale la clave TSIG
 
 **No se saca de ningún lado: se genera.** Es un secreto compartido que se crea en el
 servidor DNS y se le copia a certbot. Nadie más lo emite.
 
-### Paso 1 · En el DNS primario
+### Paso 1 · En el DNS primario — `ssh root@104.248.13.36`
 
 El primario es el que dice el SOA: **`ns2.nexotienda.app` = 104.248.13.36**, que corre
 BIND 9.18 sobre Ubuntu 24.04. Los updates dinámicos van al primario; cualquier otro
 los rechaza.
 
 ```bash
+# Si tsig-keygen no está (raro, viene con BIND):
+#   apt-get install -y bind9-utils
+
 # Generar la clave
 tsig-keygen -a HMAC-SHA512 certbot | tee /etc/bind/keys-certbot.conf
 chown root:bind /etc/bind/keys-certbot.conf
@@ -130,10 +144,10 @@ named-checkconf && rndc reload
 > Si te olvidás del `freeze`, BIND pisa tus cambios con el journal. Vale la pena
 > saberlo antes que descubrirlo.
 
-### Paso 2 · En el VPS de la app
+### Paso 2 · En el VPS de la app — `181.111.252.198`
 
 ```bash
-apt-get install -y python3-certbot-dns-rfc2136
+apt-get install -y python3-certbot-dns-rfc2136 bind9-dnsutils
 
 cat > /etc/letsencrypt/rfc2136.ini <<'EOF'
 dns_rfc2136_server = 104.248.13.36
@@ -148,10 +162,13 @@ chmod 600 /etc/letsencrypt/rfc2136.ini
 `dns_rfc2136_name` es el **nombre de la clave** (`certbot`, con el punto final), no un
 hostname. Es el error más común de este archivo.
 
-Antes de pedir el certificado conviene probar que el update llega:
+Antes de pedir el certificado conviene probar que el update llega. Copiá el archivo
+de la clave desde el DNS —o pegá el bloque a mano, es el mismo texto—:
 
 ```bash
-nsupdate -k /etc/bind/keys-certbot.conf <<'EOF'
+scp root@104.248.13.36:/etc/bind/keys-certbot.conf /root/keys-certbot.conf
+
+nsupdate -k /root/keys-certbot.conf <<'EOF'
 server 104.248.13.36
 update add _acme-challenge.nexotienda.app. 60 TXT "prueba"
 send
@@ -162,7 +179,7 @@ dig @104.248.13.36 +short TXT _acme-challenge.nexotienda.app     # → "prueba"
 Si eso anda, certbot va a andar. Si da `REFUSED`, es la `update-policy`; si da
 `NOTAUTH`, es la clave o el nombre de la clave.
 
-### Paso 3 · Emitir
+### Paso 3 · Emitir — en el VPS de la app
 
 ```bash
 certbot certonly \
@@ -175,7 +192,7 @@ certbot certonly \
 Los 60 segundos de propagación son por los secundarios: Let's Encrypt puede consultar
 cualquiera de los tres NS, y si todavía no replicaron el TXT, falla.
 
-### Paso 4 · Que nginx lo use
+### Paso 4 · Que nginx lo use — en el VPS de la app
 
 `certonly` emite el certificado pero **no toca nginx**. Hay que instalar la config con
 SSL y el hook que recarga después de cada renovación:
@@ -191,7 +208,7 @@ install -m 755 /opt/nexotienda/deploy/hooks/reload-nginx.sh \
 Sin el hook, certbot renueva y nginx sigue sirviendo el viejo hasta el próximo
 reload — y el día que venza se caen todas las tiendas juntas.
 
-### Paso 5 · Probar la renovación ahora, no en 60 días
+### Paso 5 · Probar la renovación — en el VPS de la app
 
 ```bash
 certbot renew --dry-run
