@@ -8,14 +8,30 @@ El diseño completo está en el documento fundacional (v0.2), con cada decisión
 `D1`–`D44`, los principios `P1`–`P6`, los riesgos `R1`–`R9` y lo abierto `A1`–`A7`.
 Cuando algo de acá no alcance, la referencia es ese documento.
 Lo que le pedimos a NexoPOS —y lo que tiene que construir de su lado— está en
-[docs/nexopos.md](docs/nexopos.md).
+[docs/nexopos.md](docs/nexopos.md), con la segunda tanda en
+[docs/nexopos-2-tienda-real.md](docs/nexopos-2-tienda-real.md).
+
+## El subdominio
+
+El certificado es **comodín** (`*.nexotienda.app`) y el DNS también, así que un slug
+nuevo funciona en el instante en que la API lo devuelve: no hay que emitir nada ni
+esperar nada. Lo que sí hay que cuidar (`src/lib/slug.ts`):
+
+- **Un solo espacio de nombres** para comercios, regiones y reservados. Si un comercio
+  toma `morrison`, se queda con la página del pueblo.
+- **`acme` y `acme-ns` son intocables**: son la delegación del certificado, y perderlos
+  rompe la renovación de todas las tiendas a la vez.
+- **Sin puntos.** El comodín cubre una sola etiqueta; `a.b.nexotienda.app` daría error
+  de certificado.
+- **Cambiar de slug rompe links.** Acá viajan por WhatsApp. Los anteriores quedan en
+  `previousSlugs`, siguen redirigiendo, y no se reasignan nunca.
 
 ## Superficies
 
 | Superficie | Qué es |
 |---|---|
 | `{slug}.nexotienda.app` | La tienda de un comercio. Web pública, sin app. |
-| `{pueblo}.nexotienda.app` | La página del pueblo: **buscador de existencias**, no marketplace. |
+| `{pueblo}.nexotienda.app` | La página del pueblo: **buscador de existencias**, no marketplace. La región se define por **zona de reparto**, no por dirección (D14), y su slug lo asigna un humano — los nombres de pueblo se repiten en todo el país. |
 | ClubPay → "Mis Comercios" | Relación, cuenta corriente y pago. No hay app propia del comprador. |
 
 Un pedido es **de un solo comercio**. No hay carrito combinado entre tiendas (D15).
