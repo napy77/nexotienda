@@ -123,16 +123,22 @@ en la salida del paso 1 y también con:
 python3 -c "import json;print(json.load(open('/etc/acme-dns/registro.json'))['fulldomain'])"
 ```
 
-Verificar que la delegación quedó bien antes de seguir:
+Verificar antes de seguir. Un `dig` suelto no alcanza: como existe el comodín
+`*.nexotienda.app`, **cualquier nombre resuelve**, y es fácil dar por configurado
+algo que no está. El script distingue lo que está puesto a propósito de lo que
+contesta de rebote:
 
 ```bash
-dig +short NS acme.nexotienda.app                    # → acme-ns.nexotienda.app.
-dig +short CNAME _acme-challenge.nexotienda.app      # → <id>.acme.nexotienda.app.
+curl -fsSL -o /tmp/verificar.sh https://raw.githubusercontent.com/napy77/nexotienda/main/deploy/acme-dns/verificar.sh
 ```
 
-Si el NS no resuelve, Plesk todavía no propagó o el registro quedó mal. **No sigas**
-hasta que las dos consultas contesten: si emitís antes, quemás intentos contra el
-límite de Let's Encrypt.
+```bash
+bash /tmp/verificar.sh
+```
+
+Revisa los tres registros más dos comprobaciones de punta a punta, y no da el visto
+bueno hasta que esté todo. **No emitas antes**: un intento fallido se descuenta igual
+del límite de Let's Encrypt.
 
 ### Paso 3 · Emitir — en el VPS de la app
 
