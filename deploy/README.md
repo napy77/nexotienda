@@ -61,83 +61,162 @@ dig +short cualquiercosa.nexotienda.app A     # → 181.111.252.198
 Con esto, un comercio nuevo no necesita ningún cambio de DNS: publica su tienda y
 su dirección funciona.
 
-## 2. El certificado — pendiente
+## 2. El certificado comodín
 
-Acá está la única decisión de infraestructura, y conviene entenderla porque no es
-el `certbot --nginx` de siempre.
+Un solo certificado cubre `nexotienda.app` y **todos** los subdominios, presentes y
+futuros. Un comercio nuevo no necesita ni DNS ni certificado: publica y anda.
 
-**Un certificado comodín (`*.nexotienda.app`) solo se puede emitir por DNS-01**, que
-es el desafío donde Let's Encrypt pide poner un registro TXT en la zona. El desafío
-HTTP-01 —el que usa `certbot --nginx`— no emite comodines.
+Como un comodín solo se emite por **DNS-01** —el desafío donde Let's Encrypt pide un
+registro TXT— y el DNS de `nexotienda.app` lo servimos nosotros, la forma limpia es
+**RFC2136**: certbot pone y saca el TXT solo, por update dinámico, autenticándose con
+una clave TSIG.
 
-### Opción A · Lista explícita de hosts (recomendada para arrancar)
+### De dónde sale la clave TSIG
 
-Funciona hoy, sin instalar nada nuevo, y **renueva sola**.
+**No se saca de ningún lado: se genera.** Es un secreto compartido que se crea en el
+servidor DNS y se le copia a certbot. Nadie más lo emite.
 
-```bash
-certbot --nginx \
-  -d nexotienda.app \
-  -d www.nexotienda.app \
-  -d morrison.nexotienda.app \
-  -d supersol.nexotienda.app \
-  -d donarosa.nexotienda.app
-```
+### Paso 1 · En el DNS primario
 
-El costo es que **cada comercio nuevo necesita reemitir el certificado**. Para eso
-está `agregar-host.sh`:
+El primario es el que dice el SOA: **`ns2.nexotienda.app` = 104.248.13.36**, que corre
+BIND 9.18 sobre Ubuntu 24.04. Los updates dinámicos van al primario; cualquier otro
+los rechaza.
 
 ```bash
-sudo bash /opt/nexotienda/deploy/agregar-host.sh panaderialaesquina
+# Generar la clave
+tsig-keygen -a HMAC-SHA512 certbot | tee /etc/bind/keys-certbot.conf
+chown root:bind /etc/bind/keys-certbot.conf
+chmod 640 /etc/bind/keys-certbot.conf
 ```
 
-Con el piloto de Morrison —un puñado de comercios— esto es un minuto por alta y no
-se rompe nada. Cuando la lista pase de unos veinte, pasar a la opción B.
+Sale algo así, y **ese `secret` es el que va en el ini de certbot**:
 
-Ojo con el límite de Let's Encrypt: **50 certificados nuevos por dominio por
-semana**. Reemitir agregando un host cuenta como uno nuevo, así que no conviene dar
-de alta veinte comercios de a uno el mismo día.
+```
+key "certbot" {
+    algorithm hmac-sha512;
+    secret "aBcD…muy largo…==";
+};
+```
 
-### Opción B · Comodín por DNS-01 (el destino)
+En `/etc/bind/named.conf.local`, incluir la clave y **darle permiso solo al TXT del
+desafío**:
 
-Un solo certificado cubre todos los comercios, presentes y futuros. Cero trabajo por
-alta.
+```
+include "/etc/bind/keys-certbot.conf";
 
-Como el DNS de `nexotienda.app` lo servimos nosotros (`ns1/ns2/ns3.nexotienda.app`),
-la forma limpia es **RFC2136**: certbot actualiza el TXT por DNS dinámico con una
-clave TSIG.
+zone "nexotienda.app" {
+    type master;
+    file "/var/lib/bind/nexotienda.app.zone";
+
+    // Solo ese nombre y solo TXT. Si la clave se filtra, el daño es un registro
+    // de validación, no la zona entera.
+    update-policy {
+        grant certbot name _acme-challenge.nexotienda.app. txt;
+    };
+};
+```
+
+```bash
+named-checkconf && rndc reload
+```
+
+> **Ojo, esto cambia cómo se edita la zona.** Desde que acepta updates dinámicos,
+> BIND lleva un journal (`.jnl`) y **el archivo de zona no se edita más a mano** sin
+> congelarlo antes:
+> ```bash
+> rndc freeze nexotienda.app     # editar el archivo
+> rndc thaw   nexotienda.app     # vuelve a aceptar updates
+> ```
+> Si te olvidás del `freeze`, BIND pisa tus cambios con el journal. Vale la pena
+> saberlo antes que descubrirlo.
+
+### Paso 2 · En el VPS de la app
 
 ```bash
 apt-get install -y python3-certbot-dns-rfc2136
 
 cat > /etc/letsencrypt/rfc2136.ini <<'EOF'
-dns_rfc2136_server = 181.15.244.186
+dns_rfc2136_server = 104.248.13.36
 dns_rfc2136_port = 53
 dns_rfc2136_name = certbot.
-dns_rfc2136_secret = <la clave TSIG>
+dns_rfc2136_secret = <el secret del paso 1>
 dns_rfc2136_algorithm = HMAC-SHA512
 EOF
 chmod 600 /etc/letsencrypt/rfc2136.ini
+```
 
+`dns_rfc2136_name` es el **nombre de la clave** (`certbot`, con el punto final), no un
+hostname. Es el error más común de este archivo.
+
+Antes de pedir el certificado conviene probar que el update llega:
+
+```bash
+nsupdate -k /etc/bind/keys-certbot.conf <<'EOF'
+server 104.248.13.36
+update add _acme-challenge.nexotienda.app. 60 TXT "prueba"
+send
+EOF
+dig @104.248.13.36 +short TXT _acme-challenge.nexotienda.app     # → "prueba"
+```
+
+Si eso anda, certbot va a andar. Si da `REFUSED`, es la `update-policy`; si da
+`NOTAUTH`, es la clave o el nombre de la clave.
+
+### Paso 3 · Emitir
+
+```bash
 certbot certonly \
   --dns-rfc2136 \
   --dns-rfc2136-credentials /etc/letsencrypt/rfc2136.ini \
+  --dns-rfc2136-propagation-seconds 60 \
   -d nexotienda.app -d '*.nexotienda.app'
 ```
 
-Requiere generar la clave TSIG y habilitar `update-policy` en la zona del servidor
-DNS. Es media hora de trabajo una vez, y después no se toca más.
+Los 60 segundos de propagación son por los secundarios: Let's Encrypt puede consultar
+cualquiera de los tres NS, y si todavía no replicaron el TXT, falla.
 
-**Lo que NO hay que hacer** es el DNS-01 manual (`--manual`). Emite igual, pero
-**no renueva solo**: cada 60 días hay que poner un TXT a mano, y el día que nadie se
-acuerde se caen todas las tiendas a la vez.
+### Paso 4 · Que nginx lo use
 
-### Cuál elegir
+`certonly` emite el certificado pero **no toca nginx**. Hay que instalar la config con
+SSL y el hook que recarga después de cada renovación:
 
-Arrancar con **A**, migrar a **B** antes de que la lista se ponga larga. La A
-funciona hoy y renueva sola; la B es la que escala. Migrar de una a la otra no
-rompe nada: se emite el comodín y certbot reemplaza el certificado.
+```bash
+cp /opt/nexotienda/deploy/nginx-nexotienda-ssl.conf /etc/nginx/sites-available/nexotienda
+nginx -t && systemctl reload nginx
+
+install -m 755 /opt/nexotienda/deploy/hooks/reload-nginx.sh \
+  /etc/letsencrypt/renewal-hooks/deploy/nexotienda-reload-nginx.sh
+```
+
+Sin el hook, certbot renueva y nginx sigue sirviendo el viejo hasta el próximo
+reload — y el día que venza se caen todas las tiendas juntas.
+
+### Paso 5 · Probar la renovación ahora, no en 60 días
+
+```bash
+certbot renew --dry-run
+```
+
+Es el único momento en que te enterás de que algo está mal sin que se caiga nada.
 
 ---
+
+### Si algo del comodín no sale
+
+Queda `agregar-host.sh` como salida de emergencia: emite un certificado con lista
+explícita de hosts y lo extiende comercio por comercio. Funciona y renueva solo, pero
+hay que correrlo en cada alta. Con el comodín andando no hace falta — el script lo
+detecta y avisa que ya está cubierto.
+
+```bash
+sudo bash /opt/nexotienda/deploy/agregar-host.sh panaderialaesquina
+```
+
+### Nota sobre el tercer nameserver
+
+`ns3.nexotienda.app` (200.105.94.80) no contestó cuando lo consultamos desde acá. Si
+está caído o filtrado no rompe la emisión —alcanza con que respondan ns1 y ns2— pero
+conviene revisarlo, porque un NS que no contesta agrega latencia a cada consulta.
 
 ## Después del deploy
 
