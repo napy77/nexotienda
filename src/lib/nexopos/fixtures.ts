@@ -66,6 +66,10 @@ function mapProduct(p: (typeof INITIAL_PRODUCTS)[number]): Product {
     pasilloId: p.pasilloId,
     subCategory: p.subCategory,
     origin: p.type,
+    // El default es publicado: la tienda es un subproducto del stock del POS, no
+    // algo que el comerciante tenga que curar producto por producto (D1). Los
+    // insumos no llegan hasta acá — NexoPOS ya los filtra.
+    publishedInStore: true,
     ean: p.ean,
     availability: mapAvailability(p),
   };
@@ -237,11 +241,12 @@ export const fixtures: NexoPosPort = {
   },
 
   async listProducts(storeId) {
-    return products.filter((p) => p.storeId === storeId);
+    return products.filter((p) => p.storeId === storeId && p.publishedInStore);
   },
 
   async getProduct(storeId, productId) {
-    return products.find((p) => p.storeId === storeId && p.id === productId) ?? null;
+    const found = products.find((p) => p.storeId === storeId && p.id === productId);
+    return found?.publishedInStore ? found : null;
   },
 
   async listTownStores(townSlug) {
@@ -255,9 +260,10 @@ export const fixtures: NexoPosPort = {
         ? products
             .filter(
               (p) =>
-                p.name.toLowerCase().includes(q) ||
+                p.publishedInStore &&
+                (p.name.toLowerCase().includes(q) ||
                 (p.brand ?? '').toLowerCase().includes(q) ||
-                (p.subCategory ?? '').toLowerCase().includes(q),
+                  (p.subCategory ?? '').toLowerCase().includes(q)),
             )
             .map((p) => {
               const s = stores.find((st) => st.id === p.storeId)!;

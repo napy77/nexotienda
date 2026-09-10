@@ -26,6 +26,22 @@ export function availabilityLabel(a: Availability): {
   }
 }
 
+/**
+ * Cuánto se puede pedir de esto.
+ *
+ * Con stock, el tope es lo que hay: si el POS dice 3, se compran hasta 3. Con cupo
+ * del día, lo que queda del cupo. Cuando no sabemos, no ponemos tope — lo confirma
+ * el comercio al aceptar, y un límite inventado sería peor que ninguno (P6).
+ */
+export function maxQuantity(a: Availability): number | null {
+  if (a.policy === 'stock') return Math.max(0, a.onHand);
+  if (a.policy === 'declared') {
+    if (a.state === 'out') return 0;
+    return a.quota ? Math.max(0, a.quota.remaining) : null;
+  }
+  return null;
+}
+
 export function isBuyable(a: Availability): boolean {
   if (a.policy === 'stock') return a.onHand > 0;
   if (a.policy === 'declared') return a.state === 'available';

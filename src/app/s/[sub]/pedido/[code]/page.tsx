@@ -3,19 +3,8 @@ import Link from 'next/link';
 import { Check, Clock, PackageCheck, Truck } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
 import { money } from '@/lib/format';
-import type { OrderStatus } from '@/lib/nexopos/types';
+import { statusSteps } from '@/lib/orderStatus';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
-
-/**
- * D18: la notificación no es una aceptación. El comprador ve en qué estado está, y
- * el tiempo lo declara el comercio al aceptar — nunca lo promete la plataforma.
- */
-const STEPS: { key: OrderStatus; label: string; hint: string }[] = [
-  { key: 'recibido', label: 'Recibido', hint: 'Le llegó el pedido al comercio' },
-  { key: 'aceptado', label: 'Aceptado', hint: 'Lo están preparando' },
-  { key: 'listo', label: 'Listo', hint: 'Podés pasar a retirarlo' },
-  { key: 'entregado', label: 'Entregado', hint: '' },
-];
 
 const PAYMENT_LABEL: Record<string, string> = {
   efectivo_entrega: 'Efectivo al recibir',
@@ -38,6 +27,15 @@ export default async function PedidoPage({
   const [store, order] = await Promise.all([nexopos.getStore(sub), nexopos.getOrder(code)]);
   if (!store || !order) notFound();
 
+  // "Elaborando" en vez de "armando" cuando el pedido lleva algo que el comercio
+  // hace. Sale de las líneas y no del rubro: un súper que además hace prepizzas
+  // elabora esa venta y arma las otras.
+  const products = await Promise.all(
+    order.lines.map((l) => nexopos.getProduct(order.storeId, l.productId)),
+  );
+  const elaborated = products.some((p) => p?.origin === 'propio');
+
+  const STEPS = statusSteps({ slotKind: order.slotKind, lines: order.lines, elaborated });
   const currentIndex = STEPS.findIndex((s) => s.key === order.status);
 
   return (
@@ -48,17 +46,28 @@ export default async function PedidoPage({
             Pedido {order.code}
           </p>
           <h1 className="mt-1 text-2xl font-black tracking-tight text-neutral-900">
-            Le llegó a {store.name}
+            {STEPS[Math.max(0, currentIndex)]?.label ?? 'Tu pedido'}
           </h1>
-          <p className="mt-2 text-sm text-neutral-600">
-            Todavía no lo aceptaron. Cuando lo hagan te dicen para cuándo lo tienen.
-          </p>
+          {order.status === 'recibido' && (
+            <p className="mt-2 text-sm text-neutral-600">
+              Todavía no lo aceptaron. Cuando lo hagan te dicen para cuándo lo tienen.
+            </p>
+          )}
+          {order.readyEstimate && order.status === 'aceptado' && (
+            <p className="mt-2 text-sm text-neutral-600">
+              {store.name} lo tiene para {order.readyEstimate}.
+            </p>
+          )}
 
           <ol className="mt-6 space-y-3">
             {STEPS.map((s, i) => {
               const done = i <= currentIndex;
               const Icon =
-                s.key === 'entregado' ? PackageCheck : s.key === 'listo' ? Truck : Check;
+                s.key === 'entregado'
+                  ? PackageCheck
+                  : s.key === 'en_camino' || s.key === 'listo'
+                    ? Truck
+                    : Check;
               return (
                 <li key={s.key} className="flex items-start gap-3">
                   <span

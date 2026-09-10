@@ -41,8 +41,10 @@ export function AddToCart({ product }: { product: Product }) {
         <span className="text-sm font-bold text-blue-900">{qty} en el carrito</span>
         <button
           onClick={() => cart.bump(product.id, 1)}
+          disabled={cart.atMax(product)}
           aria-label="Sumar uno"
-          className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700"
+          title={cart.atMax(product) ? 'Es todo lo que hay' : undefined}
+          className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="h-4 w-4" />
         </button>

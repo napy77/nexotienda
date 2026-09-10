@@ -134,8 +134,10 @@ export function ProductCard({
               </span>
               <button
                 onClick={() => cart.bump(product.id, 1)}
+                disabled={cart.atMax(product)}
                 aria-label="Sumar uno"
-                className="flex h-7 w-7 items-center justify-center rounded bg-blue-600 text-white shadow-2xs transition-colors hover:bg-blue-700"
+                title={cart.atMax(product) ? 'Es todo lo que hay' : undefined}
+                className="flex h-7 w-7 items-center justify-center rounded bg-blue-600 text-white shadow-2xs transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>

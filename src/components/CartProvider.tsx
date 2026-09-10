@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Product } from '@/lib/nexopos/types';
+import { maxQuantity } from './Availability';
 
 export interface CartLine {
   product: Product;
@@ -13,6 +14,8 @@ interface CartApi {
   count: number;
   subtotalCents: number;
   quantityOf: (productId: string) => number;
+  /** Ya se pidió todo lo que hay de este producto. */
+  atMax: (product: Product) => boolean;
   add: (product: Product) => void;
   bump: (productId: string, delta: number) => void;
   remove: (productId: string) => void;
@@ -51,13 +54,17 @@ export function CartProvider({ slug, children }: { slug: string; children: React
   }, [key, lines, ready]);
 
   const add = useCallback((product: Product) => {
+    const max = maxQuantity(product.availability);
     setLines((prev) => {
       const found = prev.find((l) => l.product.id === product.id);
       if (found) {
+        // No se puede pedir más de lo que hay: si el POS dice 3, el tope es 3.
+        if (max !== null && found.quantity >= max) return prev;
         return prev.map((l) =>
           l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l,
         );
       }
+      if (max !== null && max < 1) return prev;
       return [...prev, { product, quantity: 1 }];
     });
   }, []);
@@ -66,7 +73,9 @@ export function CartProvider({ slug, children }: { slug: string; children: React
     setLines((prev) =>
       prev.flatMap((l) => {
         if (l.product.id !== productId) return [l];
-        const q = l.quantity + delta;
+        const max = maxQuantity(l.product.availability);
+        let q = l.quantity + delta;
+        if (max !== null) q = Math.min(q, max);
         return q > 0 ? [{ ...l, quantity: q }] : [];
       }),
     );
@@ -86,6 +95,11 @@ export function CartProvider({ slug, children }: { slug: string; children: React
       count: lines.reduce((a, l) => a + l.quantity, 0),
       subtotalCents: lines.reduce((a, l) => a + l.product.priceCents * l.quantity, 0),
       quantityOf: (id) => lines.find((l) => l.product.id === id)?.quantity ?? 0,
+      atMax: (product) => {
+        const max = maxQuantity(product.availability);
+        if (max === null) return false;
+        return (lines.find((l) => l.product.id === product.id)?.quantity ?? 0) >= max;
+      },
       add,
       bump,
       remove,

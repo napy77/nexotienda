@@ -53,6 +53,15 @@ export interface Product {
   subCategory?: string;
   /** Canónico hereda el dato de Nexo B2B; propio lo escribió el comercio (D1). */
   origin: ProductOrigin;
+  /**
+   * Si aparece en la tienda online.
+   *
+   * Distinto de ser insumo. El insumo se compra para usar y no se vende a nadie —el
+   * jamón y la muzzarella de la pizza—; esto es un producto que **sí se vende en el
+   * mostrador** pero que el comercio no quiere online. NexoPOS no manda los insumos;
+   * esto filtra lo que queda.
+   */
+  publishedInStore: boolean;
   ean?: string;
   availability: Availability;
 }
@@ -64,6 +73,29 @@ export interface Pasillo {
   imageUrl?: string;
   subCategories: string[];
   productCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// Región
+// ---------------------------------------------------------------------------
+
+/**
+ * Un pueblo o zona con su propia página: `morrison.nexotienda.app`.
+ *
+ * No sale de la dirección del comercio. Se define por **zona de reparto** (D14): un
+ * comercio a 8 km que reparte en Morrison pertenece a Morrison; uno en el centro que
+ * solo atiende el mostrador, no. Así la página promete algo verdadero —"lo que te
+ * pueden traer"— y los casos de borde se resuelven solos.
+ *
+ * Los nombres de pueblo se repiten en todo el país, así que el slug **no puede
+ * derivarse del nombre**: lo asigna un humano y es único en todo el sistema.
+ */
+export interface Region {
+  slug: string;
+  name: string;
+  province: string;
+  /** Para desambiguar dos pueblos homónimos en la interfaz. */
+  label: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +113,17 @@ export interface FulfillmentSlot {
 
 export interface Store {
   id: string;
+  /**
+   * Lo elige el comerciante en NexoPOS. Es un subdominio, así que comparte espacio
+   * de nombres con las regiones y con los reservados — ver `SLUG_RULES`.
+   */
   slug: string;
+  /**
+   * Slugs que este comercio tuvo antes. Cambiar de slug rompe todos los links que
+   * ya circularon por WhatsApp, que es por donde viaja todo acá; los viejos siguen
+   * funcionando con redirección permanente.
+   */
+  previousSlugs?: string[];
   name: string;
   category: string;
   town: string;
