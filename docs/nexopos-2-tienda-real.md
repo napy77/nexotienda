@@ -37,7 +37,7 @@ cartel con los datos del comercio y un botón de contacto — nunca un catálogo
 
 ---
 
-## 2. Quién administra las regiones — **necesita decisión de ustedes**
+## 2. Quién administra las regiones — **necesita una decisión de producto**
 
 `morrison.nexotienda.app` es la página de un pueblo. Faltan dos definiciones.
 
@@ -87,10 +87,10 @@ Entonces son dos cosas separadas:
 | El comercio **pertenece** a la región | Se deriva de su zona de reparto |
 | El comercio **aparece** en la página del pueblo | El comerciante, con un switch |
 
-**Falta definir**: si la pertenencia la carga el admin de Nexo, o si el comerciante
-elige su región de una lista y ustedes la aprueban. Nos da igual el mecanismo; lo que
-importa es que alguien sea responsable y que el slug de la región no lo elija el
-comerciante.
+**Falta definir** (decide Germán): si la pertenencia la carga el admin de Nexo, o si el
+comerciante elige su región de una lista y se aprueba. El mecanismo da lo mismo; lo que
+importa es que alguien sea responsable y que **el slug de la región nunca lo elija el
+comerciante**.
 
 ---
 
