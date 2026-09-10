@@ -117,7 +117,11 @@ records = [
 debug = false
 
 [database]
-engine = "sqlite3"
+# "sqlite", no "sqlite3": en la 2.x el driver es glebarez/go-sqlite y se registra
+# con ese nombre. Con "sqlite3" —el nombre de la v1— sql.Open no encuentra driver,
+# acme-dns se guarda el error y sigue con la conexión en nulo: arranca bien,
+# responde DNS, y explota con un panic recién al registrar la primera cuenta.
+engine = "sqlite"
 connection = "/var/lib/acme-dns/acme-dns.db"
 
 [api]
@@ -150,6 +154,10 @@ else
   # y el motivo real quede tapado por un deadlock.
   # Igual que con el listen: una config vieja a la que le falten campos deja el
   # daemon andando pero con la API muerta, y el síntoma no señala la causa.
+  if grep -q '^engine = "sqlite3"' /etc/acme-dns/config.cfg; then
+    sed -i 's|^engine = "sqlite3"|engine = "sqlite"|' /etc/acme-dns/config.cfg
+    echo "  config ya existía · engine corregido: sqlite3 → sqlite"
+  fi
   if ! grep -q corsorigins /etc/acme-dns/config.cfg; then
     sed -i 's|^\[logconfig\]|corsorigins = [\n    "*"\n]\nuse_header = false\nheader_name = "X-Forwarded-For"\n\n[logconfig]|' \
       /etc/acme-dns/config.cfg
