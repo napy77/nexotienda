@@ -5,6 +5,7 @@ import { nexopos } from '@/lib/nexopos';
 import { money } from '@/lib/format';
 import { statusSteps } from '@/lib/orderStatus';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
+import { OrderCancelled } from '@/components/OrderCancelled';
 
 const PAYMENT_LABEL: Record<string, string> = {
   efectivo_entrega: 'Efectivo al recibir',
@@ -37,10 +38,14 @@ export default async function PedidoPage({
 
   const STEPS = statusSteps({ slotKind: order.slotKind, lines: order.lines, elaborated });
   const currentIndex = STEPS.findIndex((s) => s.key === order.status);
+  const cancelado = order.status === 'cancelado';
 
   return (
     <StoreShell store={store}>
       <div className="mx-auto max-w-2xl">
+        {cancelado ? (
+          <OrderCancelled order={order} store={store} />
+        ) : (
         <div className="rounded-xl border border-neutral-200 bg-white p-6">
           <p className="text-xs font-bold tracking-widest text-neutral-400 uppercase">
             Pedido {order.code}
@@ -94,6 +99,7 @@ export default async function PedidoPage({
             })}
           </ol>
         </div>
+        )}
 
         <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-6">
           <h2 className="mb-3 text-sm font-bold text-neutral-900">Lo que pediste</h2>

@@ -224,6 +224,32 @@ const entriesByStatement: Record<string, AccountEntry[]> = {
 const orders = new Map<string, Order>();
 let seq = 1;
 
+/** Un pedido cancelado con nota, para poder ver esa pantalla sin esperar a que pase. */
+orders.set('ORD-DEMO-CANCEL', {
+  code: 'ORD-DEMO-CANCEL',
+  storeId: 'store-supersol',
+  storeName: 'Súper SOL',
+  storeSlug: 'supersol',
+  storePhone: '03537 46-2180',
+  contact: { name: 'Marta', phone: '3537461122' },
+  lines: [
+    { productId: 'prod-prepizzas-sol', name: 'Prepizzas Caseras de Ananá (x2)', unit: 'Pack 2 unidades', quantity: 2, unitPriceCents: money(4200) },
+  ],
+  subtotalCents: money(8400),
+  feeCents: 0,
+  totalCents: money(8400),
+  slotId: 'retiro',
+  slotLabel: 'Retirar en el local',
+  slotKind: 'retiro',
+  paymentMethod: 'efectivo_entrega',
+  paymentStatus: 'no_aplica',
+  status: 'cancelado',
+  cancelledBy: 'comercio',
+  cancelReason: 'No me quedan de ananá, tengo de muzzarella y napolitana. Pasá igual y te las hago.',
+  cancelledAt: '2026-09-10T19:40:00Z',
+  createdAt: '2026-09-10T19:20:00Z',
+});
+
 export const fixtures: NexoPosPort = {
   async resolveHost(sub) {
     if (sub === TOWN.slug) return { kind: 'town', townSlug: TOWN.slug, name: TOWN.name };

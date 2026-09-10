@@ -154,11 +154,42 @@ tienda: el carrito no deja pasar del tope y el botón de sumar se deshabilita.
 
 Con producto propio y cupo del día, el tope es el cupo restante.
 
-**Lo que falta definir de su lado**: qué pasa entre que alguien pone 3 en el carrito y
-el comercio acepta el pedido, si el mostrador vendió esos 3 en el medio. Dos caminos:
-reservar al confirmar el pedido, o aceptar y que el comerciante ajuste. El mostrador
-siempre gana, así que probablemente sea lo segundo — pero hay que decidirlo, porque
-define qué le mostramos al comprador cuando pasa.
+### 4.1b Si el mostrador vendió el stock en el medio — **decidido**
+
+Alguien pone 3 en el carrito, la cajera vende esos 3, y el pedido llega. **El comercio
+cancela con una nota escrita por él.**
+
+No es un error del sistema ni un estado automático. Es lo que el comerciante le quiere
+decir a su cliente:
+
+> *"No me quedan de ananá, tengo de muzzarella y napolitana. Pasá igual y te las hago."*
+
+Eso mantiene la venta y la relación; un *"pedido cancelado: sin stock"* las corta las
+dos. Es la misma doctrina de siempre: la plataforma no arbitra, acerca a las dos
+personas (D36).
+
+Ya está implementado del lado de la tienda. Lo que necesitamos de ustedes:
+
+- `Order.cancelReason` — **texto libre del comerciante**, no un código ni una plantilla
+  nuestra.
+- `Order.cancelledBy` — `comercio`, `comprador` o `vencimiento`.
+- Que cancelar cueste **un gesto**: si escribir la nota son tres pantallas, el
+  comerciante cancela sin nota y perdimos lo único que hacía valioso esto. Un par de
+  motivos de un toque ("se me acabó", "no llego con el horario") más un campo para
+  escribir, con el teclado ya abierto.
+
+**Y una cosa que esto destapa, que hay que resolver.** Hoy el cobro online se captura
+en el checkout, **antes** de que el comercio acepte. Si después cancela, hay que
+devolver la plata. Dos caminos:
+
+1. **Autorizar en el checkout y capturar al aceptar.** Es el modelo correcto y Mercado
+   Pago lo soporta. Si el comercio cancela, se libera la autorización y no hubo
+   movimiento.
+2. **Capturar ya y devolver si cancela.** Más simple de construir, pero el comprador ve
+   el débito y después el crédito, y el que atiende el reclamo es el comerciante.
+
+Para el piloto el caso es angosto —la mayoría va a ser efectivo contra entrega, donde
+no hay nada capturado— pero conviene decidirlo antes de que haya volumen.
 
 ### 4.2 Dos flags distintos, no uno
 
@@ -236,13 +267,18 @@ comercio: un súper que además hace prepizzas *elabora* esa venta y *arma* las 
 
 ---
 
-## Resumen de lo que necesitamos decidido
+## Resumen: qué falta y de quién es
 
-| | Quién |
+Aclaración, porque en la primera versión de este documento estaba mal atribuido: casi
+todo lo que sigue son **decisiones de producto**, no de ingeniería. Las toma Germán;
+NexoPOS las implementa.
+
+| | Quién decide |
 |---|---|
-| Quién crea las regiones y con qué slug | **Ustedes / producto** |
-| Cómo se asigna un comercio a una región (y el opt-in de aparecer) | **Ustedes / producto** |
-| Qué pasa si el mostrador vendió el stock mientras el pedido estaba en curso | **Ustedes** |
-| Vencimiento del pedido: minutos, y la excepción de fuera de horario | **Ustedes** |
-| Canal de aviso al comercio: mail, WhatsApp Business API, push | **Germán** (la cuenta de WhatsApp) |
-| Las tres credenciales de la API para que dejemos los fixtures | **Ustedes** |
+| Quién crea las regiones y con qué slug | **Germán** |
+| Cómo se asigna un comercio a una región, y el opt-in de aparecer | **Germán** |
+| Si el mostrador vende el stock en el medio | ✅ **Decidido**: cancelar con nota |
+| Capturar el pago al cobrar o al aceptar (ver 4.1b) | **Germán** |
+| Vencimiento del pedido: minutos, y la excepción de fuera de horario | **Germán** |
+| Canal de aviso al comercio | **Germán** (hay que abrir la cuenta de WhatsApp Business API) |
+| Las tres credenciales de la API para que dejemos los fixtures | **NexoPOS** — esto sí es de ustedes |

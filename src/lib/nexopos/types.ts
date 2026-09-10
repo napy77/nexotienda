@@ -316,7 +316,18 @@ export interface Order {
   createdAt: string;
   /** Lo declara el comercio al aceptar. Nunca lo promete la plataforma (D20). */
   readyEstimate?: string;
+  /**
+   * Por qué se canceló, **en palabras del comercio**.
+   *
+   * No es un código de error ni una plantilla nuestra: es lo que el comerciante le
+   * quiere decir a su cliente. "No me quedan de ananá, tengo de muzzarella y
+   * napolitana" mantiene la venta y la relación; un "sin stock" del sistema la
+   * corta. La plataforma no arbitra: acerca a las dos personas (D36).
+   */
   cancelReason?: string;
+  /** Quién canceló: el comercio, el comprador, o el vencimiento automático (D19). */
+  cancelledBy?: 'comercio' | 'comprador' | 'vencimiento';
+  cancelledAt?: string;
 }
 
 export interface NewOrder {
