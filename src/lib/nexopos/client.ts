@@ -20,6 +20,7 @@ import type {
   Order,
   Pasillo,
   Product,
+  Region,
   Store,
   TownSearchResult,
 } from './types';
@@ -59,9 +60,11 @@ const merchant = <T>(storeId: string, path: string, init?: RequestInit) =>
 export const client: NexoPosPort = {
   // --- plataforma ---
   resolveHost: (sub) => platform(`/v1/hosts/${encodeURIComponent(sub)}`),
-  listTownStores: (townSlug) => platform<Store[]>(`/v1/towns/${townSlug}/stores`),
+  listRegions: () => platform<Region[]>('/v1/regions'),
+  getRegion: (slug) => platform<Region | null>(`/v1/regions/${slug}`),
+  listTownStores: (townSlug) => platform<Store[]>(`/v1/regions/${townSlug}/stores`),
   searchTown: (townSlug, query) =>
-    platform<TownSearchResult>(`/v1/towns/${townSlug}/search?q=${encodeURIComponent(query)}`),
+    platform<TownSearchResult>(`/v1/regions/${townSlug}/search?q=${encodeURIComponent(query)}`),
 
   // --- del comercio ---
   getStore: (slug) => platform<Store | null>(`/v1/stores/${encodeURIComponent(slug)}`),

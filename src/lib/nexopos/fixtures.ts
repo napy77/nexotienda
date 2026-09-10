@@ -18,11 +18,20 @@ import type {
   Order,
   Pasillo,
   Product,
+  Region,
   Store,
   TownSearchResult,
 } from './types';
 
 const TOWN = { slug: 'morrison', name: 'Morrison' };
+
+/** El slug lo asigna un humano en el admin de Nexo B2B: los nombres se repiten. */
+const REGION: Region = {
+  slug: 'morrison',
+  name: 'Morrison',
+  province: 'Córdoba',
+  label: 'Morrison, Córdoba',
+};
 
 const SLUGS: Record<string, string> = {
   'store-supersol': 'supersol',
@@ -84,7 +93,7 @@ function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
     name: s.name,
     category: s.category,
     town: TOWN.name,
-    townSlug: TOWN.slug,
+    regions: [{ regionSlug: TOWN.slug, listedInTownPage: true }],
     address: s.address,
     phone: s.phone,
     whatsapp: s.phone,
@@ -127,7 +136,7 @@ const jureHnos: Store = {
   name: 'Jure Hnos.',
   category: 'Corralón y Materiales',
   town: TOWN.name,
-  townSlug: TOWN.slug,
+  regions: [{ regionSlug: TOWN.slug, listedInTownPage: true }],
   address: 'Ruta 9 km 483, Morrison',
   phone: '03537 46-2900',
   whatsapp: '03537 46-2900',
@@ -275,8 +284,20 @@ export const fixtures: NexoPosPort = {
     return found?.publishedInStore ? found : null;
   },
 
+  async listRegions() {
+    return [REGION];
+  },
+
+  async getRegion(slug) {
+    return slug === REGION.slug ? REGION : null;
+  },
+
   async listTownStores(townSlug) {
-    return townSlug === TOWN.slug ? stores : [];
+    // Solo los que el comerciante habilitó a figurar (D13): pertenecer a la región
+    // y querer aparecer en su página son decisiones distintas, de gente distinta.
+    return stores.filter((s) =>
+      s.regions.some((r) => r.regionSlug === townSlug && r.listedInTownPage),
+    );
   },
 
   async searchTown(townSlug, query) {

@@ -87,10 +87,43 @@ Entonces son dos cosas separadas:
 | El comercio **pertenece** a la región | Se deriva de su zona de reparto |
 | El comercio **aparece** en la página del pueblo | El comerciante, con un switch |
 
-**Falta definir** (decide Germán): si la pertenencia la carga el admin de Nexo, o si el
-comerciante elige su región de una lista y se aprueba. El mecanismo da lo mismo; lo que
-importa es que alguien sea responsable y que **el slug de la región nunca lo elija el
-comerciante**.
+### 2.3 Dónde se administra esto — **hay que construirlo, hoy no existe**
+
+Decidir no sirve si no hay pantalla. Y el criterio que ordena dónde va cada cosa no es
+de qué producto es la funcionalidad, sino **quién decide**:
+
+| Quién decide | Dónde vive la pantalla |
+|---|---|
+| El **comerciante** — su slug, si aparece en la página del pueblo | Su perfil en **NexoPOS** |
+| **Nexo** — qué regiones existen, qué comercio va en cuál | El admin de **Nexo B2B** |
+
+**La región va en el admin de Nexo B2B**, por tres razones:
+
+1. **El comercio ya vive ahí.** El alta del comerciante es en B2B y el login de NexoPOS
+   es esa misma cuenta. Asignarle una región es ponerle un atributo a algo que B2B ya
+   es dueño; hacerlo en otro lado duplica la fuente de verdad.
+2. **La taxonomía compartida ya vive ahí.** Pasillo → Rubro → Subrubro es el mismo tipo
+   de cosa: un vocabulario que Nexo cura y que todos consumen. La región es otra rama.
+3. **Es el único panel con vista de Nexo.** NexoPOS ve un comercio. NexoTienda no tiene
+   admin, y construirle uno sería un cuarto login y una segunda lista de comercios que
+   se va a desincronizar.
+
+Dos pantallas nuevas en el admin de B2B:
+
+- **Regiones**: listado con alta — slug, nombre, provincia, label. Es donde se crea
+  `ballesteros` y donde se resuelven las colisiones el día que aparezca otra Santa Rosa.
+- **En la ficha del comercio, "Regiones donde reparte"**: multiselección. Conviene poder
+  verlo también desde la región, pero el dato canónico es del comercio.
+
+Y una en NexoPOS: el switch **"aparecer en la página de {región}"**, uno por región a la
+que pertenezca.
+
+### 2.4 Mientras tanto, para el piloto
+
+Construir el admin lleva su tiempo y Morrison son un puñado de comercios. **Para
+arrancar alcanza con sembrar los datos a mano en la base** —crear Morrison, asignarle
+los comercios— y construir las pantallas cuando haya un segundo o tercer pueblo. Lo que
+no conviene es que el piloto espere al admin.
 
 ---
 

@@ -98,6 +98,19 @@ export interface Region {
   label: string;
 }
 
+/**
+ * La relación comercio–región, que es de muchos a muchos.
+ *
+ * Son dos cosas distintas y las decide gente distinta (D13, D14):
+ * - **Pertenecer** lo decide Nexo, por zona de reparto. Vive en el admin de B2B.
+ * - **Aparecer** lo decide el comerciante, con un switch en NexoPOS. Un comercio
+ *   puede repartir en dos pueblos y querer figurar solo en uno.
+ */
+export interface StoreRegion {
+  regionSlug: string;
+  listedInTownPage: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Comercio
 // ---------------------------------------------------------------------------
@@ -126,8 +139,17 @@ export interface Store {
   previousSlugs?: string[];
   name: string;
   category: string;
+  /**
+   * Etiqueta para mostrar en el encabezado de la tienda: "Súper SOL · Morrison".
+   * Es la región principal, y existe solo para no tener que resolver `regions` en
+   * cada pantalla.
+   */
   town: string;
-  townSlug: string;
+  /**
+   * Dónde reparte de verdad. Muchos a muchos, porque no sale de la dirección sino
+   * de la zona de reparto (D14): un comercio puede repartir en dos pueblos.
+   */
+  regions: StoreRegion[];
   address: string;
   /** Habilita el botón de contacto: la válvula de escape del modelo. */
   phone?: string;
@@ -383,6 +405,9 @@ export interface NexoPosPort {
   resolveHost(sub: string): Promise<
     { kind: 'store'; store: Store } | { kind: 'town'; townSlug: string; name: string } | null
   >;
+  listRegions(): Promise<Region[]>;
+  getRegion(slug: string): Promise<Region | null>;
+  /** Solo los que el comerciante habilitó a figurar (D13). */
   listTownStores(townSlug: string): Promise<Store[]>;
   searchTown(townSlug: string, query: string): Promise<TownSearchResult>;
 
