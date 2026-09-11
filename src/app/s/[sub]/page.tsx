@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
 import { getAccountId } from '@/lib/session';
@@ -9,12 +9,6 @@ import { StoreHero } from '@/components/StoreHero';
 import { TownSearch } from '@/components/TownSearch';
 import { ValueProps } from '@/components/ValueProps';
 
-/** Foto de portada por comercio. Cuando NexoPOS la exponga, sale del `Store`. */
-const COVERS: Record<string, string> = {
-  supersol: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&q=80',
-  donarosa: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&q=80',
-};
-
 type Props = { params: Promise<{ sub: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -23,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!resolved) return { title: 'NexoTienda' };
 
   // El link de la tienda viaja por WhatsApp: el preview tiene que decir algo útil.
+  if (resolved.kind === 'moved') return { title: 'NexoTienda' };
   if (resolved.kind === 'town') {
     return {
       title: `Comercios de ${resolved.name}`,
@@ -45,6 +40,13 @@ export default async function SubdomainPage({ params }: Props) {
   const { sub } = await params;
   const resolved = await nexopos.resolveHost(sub);
   if (!resolved) notFound();
+
+  // El comercio cambió de dirección. Los links viejos siguen circulando por
+  // WhatsApp —el estado del súper, el grupo del barrio— y dejarlos morir sería
+  // matar ventas que ya estaban hechas.
+  if (resolved.kind === 'moved') {
+    permanentRedirect(`https://${resolved.slug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nexotienda.app'}`);
+  }
 
   if (resolved.kind === 'town') {
     const stores = await nexopos.listTownStores(resolved.townSlug);
@@ -105,7 +107,7 @@ export default async function SubdomainPage({ params }: Props) {
   ]);
 
   return (
-    <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={COVERS[store.slug]} />}>
+    <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={store.bannerUrl} />}>
       <ValueProps store={store} account={account} />
       <Catalog store={store} pasillos={pasillos} products={products} />
     </StoreShell>

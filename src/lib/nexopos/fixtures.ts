@@ -98,6 +98,9 @@ function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
     phone: s.phone,
     whatsapp: s.phone,
     logoUrl: s.logoUrl,
+    bannerUrl: isRotiseria
+      ? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&q=80'
+      : 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&q=80',
     openingHours: s.openingHours,
     // Lo que decide es esto; el texto de arriba es para leer.
     schedule: isRotiseria

@@ -172,6 +172,8 @@ export interface Store {
   phone?: string;
   whatsapp?: string;
   logoUrl?: string;
+  /** La foto ancha de la tienda. El logo identifica; el banner es su cara. */
+  bannerUrl?: string;
   /** Texto para mostrar. El comerciante lo escribe mejor que cualquier formateo. */
   openingHours?: string;
   /** La fuente de la decisión. Lo de arriba es para leer, esto es para calcular. */
@@ -430,11 +432,26 @@ export interface TownSearchResult {
  */
 export interface NexoPosPort {
   // --- plataforma ---
+  /**
+   * Qué es este subdominio.
+   *
+   * `moved` es un slug que el comercio dejó atrás: los links viejos siguen
+   * circulando por WhatsApp y no se pueden dejar morir, así que redirigen al
+   * actual (D: `previousSlugs`).
+   */
   resolveHost(sub: string): Promise<
-    { kind: 'store'; store: Store } | { kind: 'town'; townSlug: string; name: string } | null
+    | { kind: 'store'; store: Store }
+    | { kind: 'town'; townSlug: string; name: string }
+    | { kind: 'moved'; slug: string }
+    | null
   >;
-  listRegions(): Promise<Region[]>;
-  getRegion(slug: string): Promise<Region | null>;
+  /**
+   * Todavía no existe del lado de NexoPOS: la región llega dentro del `Store`.
+   * Queda declarado porque la página del pueblo lo va a necesitar para su título
+   * y para desambiguar homónimos.
+   */
+  listRegions?(): Promise<Region[]>;
+  getRegion?(slug: string): Promise<Region | null>;
   /** Solo los que el comerciante habilitó a figurar (D13). */
   listTownStores(townSlug: string): Promise<Store[]>;
   searchTown(townSlug: string, query: string): Promise<TownSearchResult>;
