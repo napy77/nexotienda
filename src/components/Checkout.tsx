@@ -44,7 +44,11 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
   const [address, setAddress] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  // Dos cosas distintas y no se muestran igual: `error` es algo que el comprador
+  // puede arreglar acá mismo —falta la dirección, falta el teléfono— y `falla` es
+  // que el pedido no se pudo mandar, que él no puede resolver y necesita salida.
   const [error, setError] = useState<string | null>(null);
+  const [falla, setFalla] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const slot = store.slots.find((s) => s.id === slotId);
@@ -77,6 +81,7 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
 
   function submit() {
     setError(null);
+    setFalla(null);
     if (slot?.kind === 'reparto' && address.trim().length < 5) {
       setError('Necesitamos la dirección para llevártelo.');
       return;
@@ -97,7 +102,7 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         contact: account ? undefined : { name: name.trim(), phone: phone.trim() },
       });
       if (!res.ok) {
-        setError(res.error);
+        setFalla(res.error);
         return;
       }
       cart.clear();
@@ -342,7 +347,25 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
             </div>
           </dl>
 
-          {error && <p className="mt-3 text-xs font-medium text-red-700">{error}</p>}
+          {/* Algo que falta completar: se dice y ya, el botón está justo abajo. */}
+          {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
+
+          {/*
+            El pedido no salió. El carrito ya está armado y el nombre escrito:
+            mandarlo a buscar el teléfono en ese momento es perder la venta. El botón
+            es la misma válvula de escape de siempre — cuando el sistema no puede,
+            que hablen las dos personas.
+          */}
+          {falla && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-sm font-medium text-red-800">
+                {falla} Podés encargárselo directo a {store.name}.
+              </p>
+              <div className="mt-3">
+                <ContactButton store={store} className="w-full justify-center" />
+              </div>
+            </div>
+          )}
 
           <button
             onClick={submit}

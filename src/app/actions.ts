@@ -31,8 +31,10 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
     console.error('[nexotienda] createOrder falló', e);
     return {
       ok: false,
-      error:
-        'No pudimos mandar tu pedido. Probá de nuevo en un momento, o llamá al comercio.',
+      // Sin prometer que reintentar sirve: si el pedido no salió, puede ser algo
+      // que no se arregla solo. La salida real es hablar con el comercio, y el
+      // botón para hacerlo está al lado de este mensaje.
+      error: 'No pudimos mandar tu pedido.',
     };
   }
 
