@@ -9,7 +9,8 @@ El diseño completo está en el documento fundacional (v0.2), con cada decisión
 Cuando algo de acá no alcance, la referencia es ese documento.
 Lo que le pedimos a NexoPOS —y lo que tiene que construir de su lado— está en
 [docs/nexopos.md](docs/nexopos.md), con la segunda tanda en
-[docs/nexopos-2-tienda-real.md](docs/nexopos-2-tienda-real.md).
+[docs/nexopos-2-tienda-real.md](docs/nexopos-2-tienda-real.md) y lo que falta para
+cerrar un carrito en [docs/nexopos-3-pedidos.md](docs/nexopos-3-pedidos.md).
 
 ## El subdominio
 
