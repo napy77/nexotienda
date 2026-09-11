@@ -118,6 +118,28 @@ Dos pantallas nuevas en el admin de B2B:
 Y una en NexoPOS: el switch **"aparecer en la página de {región}"**, uno por región a la
 que pertenezca.
 
+### 2.3b Preguntarlo al publicar, en vez de dejarlo apagado
+
+**Corrección sobre lo que habíamos dicho.** Pedimos que el switch de aparecer en la
+página del pueblo arranque apagado, y está bien implementado así. Pero probándolo con
+Morrison apareció el costo: la región se espejó, los tres comercios estaban ahí, y la
+página salió **vacía** — porque ninguno sabía que existía un switch que prender.
+
+El argumento para que arranque apagado sigue siendo válido: poner a dos supermercados
+del mismo pueblo uno al lado del otro con los precios a la vista es una decisión
+social que el comerciante tiene que tomar, no un default nuestro.
+
+Pero la forma correcta de respetar eso **no es el silencio, es la pregunta**. Cuando
+el comerciante publica su tienda, preguntarle ahí mismo:
+
+> *¿Querés aparecer también en la página de Morrison?*
+> Ahí la gente del pueblo busca quién tiene lo que necesita.
+
+Con el sí sugerido. Sigue siendo su decisión —puede decir que no— pero se la hacemos
+en el momento en que tiene sentido, en vez de esconderla en una pantalla de ajustes
+que nadie visita. Un default apagado que nadie sabe que existe no es "el comerciante
+decidió no aparecer": es que nunca se enteró.
+
 ### 2.4 Mientras tanto, para el piloto
 
 Construir el admin lleva su tiempo y Morrison son un puñado de comercios. **Para

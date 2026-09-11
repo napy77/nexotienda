@@ -24,9 +24,15 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
   try {
     order = await nexopos.createOrder(input);
   } catch (e) {
+    // El detalle va al log, no a la pantalla. "NexoPOS respondió 401 en /v1/orders"
+    // no le dice nada a alguien que está comprando fideos, y encima cuenta cómo
+    // está armado esto por dentro. Lo que sí sirve es que sepa que el pedido no
+    // salió y que puede llamar al comercio.
+    console.error('[nexotienda] createOrder falló', e);
     return {
       ok: false,
-      error: e instanceof Error ? e.message : 'No pudimos registrar el pedido',
+      error:
+        'No pudimos mandar tu pedido. Probá de nuevo en un momento, o llamá al comercio.',
     };
   }
 
@@ -50,10 +56,8 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
   } catch (e) {
     // El pedido ya existe y le llegó al comercio. Que falle el cobro no lo borra:
     // lo dejamos pendiente y que lo arreglen entre ellos.
-    return {
-      ok: true,
-      code: order.code,
-    };
+    console.error('[nexotienda] createIntent falló', e);
+    return { ok: true, code: order.code };
   }
 }
 
@@ -87,10 +91,8 @@ export async function payAccountAction(input: {
     });
     return { ok: true, checkoutUrl: intent.checkoutUrl };
   } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : 'No pudimos iniciar el pago',
-    };
+    console.error('[nexotienda] payAccount falló', e);
+    return { ok: false, error: 'No pudimos iniciar el pago. Probá de nuevo en un momento.' };
   }
 }
 
