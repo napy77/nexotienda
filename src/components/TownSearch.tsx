@@ -33,6 +33,34 @@ export function TownSearch({
     start(async () => setHits(await searchTownAction(townSlug, q)));
   }
 
+  // Sin comercios publicados, el buscador promete algo que la página no puede
+  // cumplir: cualquier búsqueda va a volver vacía. Es más honesto decir que
+  // todavía no hay nada que ofrecer una caja que no sirve.
+  if (stores.length === 0) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6">
+        <StoreIcon className="h-10 w-10 text-neutral-300" />
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-neutral-900">
+            Todavía no hay comercios en {townName}
+          </h1>
+          <p className="mt-3 text-base leading-relaxed text-neutral-600">
+            Cuando los comercios del pueblo publiquen su tienda, vas a poder buscar acá
+            quién tiene lo que necesitás.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-neutral-200 bg-white p-5">
+          <p className="text-sm font-semibold text-neutral-900">Si tenés un comercio acá</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Desde NexoPOS podés publicar tu tienda y elegir aparecer en esta página. Tu
+            dirección propia funciona igual, aunque no aparezcas acá.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <header className="bg-neutral-900 py-12 text-white">
@@ -137,6 +165,11 @@ export function TownSearch({
           <h2 className="mb-3 text-sm font-bold tracking-wide text-neutral-500 uppercase">
             Comercios de {townName}
           </h2>
+          {stores.every((s) => !s.storefrontPublished) && (
+            <p className="mb-3 rounded-lg bg-neutral-100 p-4 text-sm text-neutral-600">
+              Ninguno vende online todavía. Podés pasar por el local o llamarlos.
+            </p>
+          )}
           <ul className="grid gap-2 sm:grid-cols-2">
             {stores.map((s) => (
               <li key={s.id} className="rounded-xl border border-neutral-200 bg-white p-4">
