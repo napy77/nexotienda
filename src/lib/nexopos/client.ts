@@ -55,19 +55,42 @@ const KEYS = {
 type Capacidad = keyof typeof KEYS;
 
 async function call<T>(cap: Capacidad, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${KEYS[cap]}`,
-      ...init?.headers,
-    },
-    // El stock cambia con cada venta del mostrador: no lo cacheamos.
-    cache: 'no-store',
-  });
+  if (!BASE) throw new Error('NEXOPOS_API_URL está vacío pero se eligió el cliente HTTP.');
+  if (!KEYS[cap]) {
+    throw new Error(
+      `Falta la clave de ${cap}: seteá NEXOPOS_KEY_${cap.toUpperCase()} en /opt/nexotienda/.env ` +
+        `con el mismo valor que NEXOTIENDA_KEY_${cap.toUpperCase()} en NexoPOS, y volvé a desplegar.`,
+    );
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${KEYS[cap]}`,
+        ...init?.headers,
+      },
+      // El stock cambia con cada venta del mostrador: no lo cacheamos.
+      cache: 'no-store',
+    });
+  } catch (e) {
+    throw new Error(
+      `No se pudo llegar a NexoPOS en ${BASE} — ${e instanceof Error ? e.message : e}`,
+    );
+  }
   if (res.status === 404) return null as T;
-  if (!res.ok) throw new Error(`NexoPOS ${res.status} en ${path}`);
+  if (!res.ok) {
+    // El cuerpo suele decir qué pasó —"Clave inválida para esta parte de la API",
+    // "La API de catalogo no está habilitada"— y sin él el 401 y el 503 se ven
+    // iguales desde acá. Un error que no dice la causa cuesta una hora de más.
+    const detalle = await res.text().catch(() => '');
+    throw new Error(
+      `NexoPOS respondió ${res.status} en ${path}${detalle ? ` — ${detalle.slice(0, 300)}` : ''}`,
+    );
+  }
   return (await res.json()) as T;
 }
 
