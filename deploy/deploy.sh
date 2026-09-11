@@ -97,6 +97,16 @@ EOF
   echo "  .env generado — está vacío a propósito: arranca con fixtures."
 else
   echo "  .env ya existe, no se toca"
+  # No se reescribe —puede tener claves de verdad— pero sí se avisa si quedó con
+  # nombres de variables que el código ya no lee. Sin esto, el día que peguen las
+  # claves reales en la variable vieja no las lee nadie y el síntoma es que la
+  # tienda sigue mostrando los fixtures, que no señala la causa por ningún lado.
+  for vieja in NEXOPOS_API_KEY NEXOPOS_PLATFORM_KEY NEXOPOS_MERCHANT_KEY; do
+    if grep -q "^${vieja}=" "$ENV_FILE"; then
+      echo "  ⚠ $ENV_FILE tiene ${vieja}, que ya no se usa."
+      echo "    Las de ahora son NEXOPOS_KEY_CATALOGO, NEXOPOS_KEY_PEDIDOS y NEXOPOS_KEY_CUENTAS."
+    fi
+  done
 fi
 
 echo "══ 4/6 · Dependencias y build ═══════════════════════════════════"
