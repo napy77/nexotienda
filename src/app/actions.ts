@@ -132,3 +132,31 @@ export async function settlePaymentAction(
   revalidatePath(intent.returnUrl);
   return { ok: intent.status === 'aprobado', returnUrl: intent.returnUrl };
 }
+
+/**
+ * El latido del pedido: lo mínimo para saber si algo cambió.
+ *
+ * La pantalla de seguimiento la consulta cada tanto. Devuelve una huella y no el
+ * pedido entero a propósito — esto se llama muchas veces por pedido y lo caro es
+ * rearmar la página, no preguntar. Solo cuando la huella cambia se refresca.
+ *
+ * Es un parche hasta que NexoPOS mande los webhooks que les pedimos: ellos saben
+ * cuándo el comerciante toca el botón, nosotros solo podemos preguntar.
+ */
+export async function orderPulseAction(code: string): Promise<string | null> {
+  try {
+    const order = await nexopos.getOrder(code);
+    if (!order) return null;
+    return [
+      order.status,
+      order.paymentStatus,
+      order.readyEstimate ?? '',
+      order.cancelReason ?? '',
+    ].join('|');
+  } catch (e) {
+    // Que la API esté caída no es noticia para el que está esperando su pizza: la
+    // pantalla se queda como está y se vuelve a preguntar en el próximo turno.
+    console.error('[nexotienda] orderPulse falló', e);
+    return null;
+  }
+}

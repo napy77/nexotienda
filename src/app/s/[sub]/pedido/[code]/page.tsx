@@ -6,6 +6,7 @@ import { money } from '@/lib/format';
 import { statusSteps } from '@/lib/orderStatus';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { OrderCancelled } from '@/components/OrderCancelled';
+import { OrderLive } from '@/components/OrderLive';
 
 const PAYMENT_LABEL: Record<string, string> = {
   efectivo_entrega: 'Efectivo al recibir',
@@ -39,6 +40,15 @@ export default async function PedidoPage({
   const STEPS = statusSteps({ slotKind: order.slotKind, lines: order.lines, elaborated });
   const currentIndex = STEPS.findIndex((s) => s.key === order.status);
   const cancelado = order.status === 'cancelado';
+
+  // La misma huella que devuelve `orderPulseAction`. Si el servidor devuelve otra,
+  // es que el comerciante tocó algo y hay que rearmar la pantalla.
+  const pulse = [
+    order.status,
+    order.paymentStatus,
+    order.readyEstimate ?? '',
+    order.cancelReason ?? '',
+  ].join('|');
 
   return (
     <StoreShell store={store}>
@@ -90,7 +100,13 @@ export default async function PedidoPage({
                     >
                       {s.label}
                     </span>
-                    {done && s.hint && (
+                    {/*
+                      El hint es del paso **en curso**, no del cumplido. "Todavía no
+                      lo aceptaron" colgado debajo de un tilde azul, con el pedido ya
+                      aceptado y en preparación, es información vieja contradiciendo
+                      a la de al lado.
+                    */}
+                    {i === currentIndex && s.hint && (
                       <span className="block text-xs text-neutral-500">{s.hint}</span>
                     )}
                   </span>
@@ -98,6 +114,8 @@ export default async function PedidoPage({
               );
             })}
           </ol>
+
+          <OrderLive code={order.code} pulse={pulse} terminal={order.status === 'entregado'} />
         </div>
         )}
 
