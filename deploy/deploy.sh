@@ -82,11 +82,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
 NEXT_PUBLIC_ROOT_DOMAIN=${DOMAIN}
 
 # API de NexoPOS. Vacío = la tienda corre con los fixtures de diseño.
-# Dos credenciales, no una: la de plataforma resuelve el subdominio y el pueblo;
-# la del comercio toca su catálogo, sus cuentas y sus pedidos.
+# Tres claves separadas por capacidad: catálogo, pedidos y cuentas. La de cuentas
+# sola no alcanza — esos endpoints piden además la sesión del token de ClubPay.
 NEXOPOS_API_URL=
-NEXOPOS_PLATFORM_KEY=
-NEXOPOS_MERCHANT_KEY=
+NEXOPOS_KEY_CATALOGO=
+NEXOPOS_KEY_PEDIDOS=
+NEXOPOS_KEY_CUENTAS=
 
 # Mercado Pago del comercio. Vacío = el cobro corre en sandbox.
 MP_ACCESS_TOKEN=

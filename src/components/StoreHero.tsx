@@ -1,11 +1,13 @@
 import { BadgeCheck, ShoppingCart } from 'lucide-react';
 import type { Store } from '@/lib/nexopos/types';
+import { openLabel, openState } from '@/lib/horario';
 
 /**
  * El banner de la tienda. Todo sale de los datos del comercio: nada hardcodeado,
  * porque esto lo van a ver cientos de tiendas distintas.
  */
 export function StoreHero({ store, coverUrl }: { store: Store; coverUrl?: string }) {
+  const abierto = openLabel(openState(store));
   return (
     <div className="relative h-44 w-full overflow-hidden bg-neutral-800 sm:h-56 md:h-60">
       {coverUrl && (
@@ -39,9 +41,15 @@ export function StoreHero({ store, coverUrl }: { store: Store; coverUrl?: string
 
       <div className="absolute right-6 bottom-4 z-10 hidden items-center gap-2 rounded-full border border-white/15 bg-neutral-900/80 px-3.5 py-1.5 text-xs text-white backdrop-blur-md md:flex">
         <span
-          className={`h-2 w-2 rounded-full ${store.isOpenNow ? 'bg-emerald-400' : 'bg-neutral-400'}`}
+          className={`h-2 w-2 rounded-full ${
+            abierto.tone === 'ok'
+              ? 'bg-emerald-400'
+              : abierto.tone === 'off'
+                ? 'bg-neutral-400'
+                : 'bg-amber-300'
+          }`}
         />
-        <span>{store.isOpenNow ? 'Abierto ahora' : 'Cerrado ahora'}</span>
+        <span>{abierto.text}</span>
       </div>
     </div>
   );

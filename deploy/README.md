@@ -229,8 +229,9 @@ systemctl status nexotienda        # estado
 | Variable | Vacío significa |
 |---|---|
 | `NEXOPOS_API_URL` | La tienda corre con los fixtures de diseño |
-| `NEXOPOS_PLATFORM_KEY` | — resuelve subdominio y pueblo |
-| `NEXOPOS_MERCHANT_KEY` | — catálogo, cuentas y pedidos del comercio |
+| `NEXOPOS_KEY_CATALOGO` | — lo que la tienda muestra |
+| `NEXOPOS_KEY_PEDIDOS` | — crear y leer pedidos |
+| `NEXOPOS_KEY_CUENTAS` | — cuenta corriente (pide también el token de ClubPay) |
 | `MP_ACCESS_TOKEN` | El cobro corre en sandbox |
 
 Después de tocarlo: `sudo bash deploy.sh` — las `NEXT_PUBLIC_*` se hornean al

@@ -115,6 +115,23 @@ export interface StoreRegion {
 // Comercio
 // ---------------------------------------------------------------------------
 
+/**
+ * Un tramo de atención. Varios por día: el almacén cierra al mediodía.
+ *
+ * Existe porque de un texto libre no se puede decidir nada. `"Lun a Sáb de 8 a 13 y
+ * de 17 a 20:30"` es clarísimo para una persona y no se puede evaluar — y una
+ * heurística sobre ese texto acertaría casi siempre y fallaría los domingos, que es
+ * cuando importa.
+ */
+export interface OpeningSlot {
+  /** 0 = domingo. */
+  day: number;
+  /** "08:00" */
+  from: string;
+  /** "13:00" */
+  to: string;
+}
+
 /** Franja de reparto o de retiro. El default del almacén es programado (D20). */
 export interface FulfillmentSlot {
   id: string;
@@ -155,8 +172,19 @@ export interface Store {
   phone?: string;
   whatsapp?: string;
   logoUrl?: string;
+  /** Texto para mostrar. El comerciante lo escribe mejor que cualquier formateo. */
   openingHours?: string;
-  isOpenNow: boolean;
+  /** La fuente de la decisión. Lo de arriba es para leer, esto es para calcular. */
+  schedule?: OpeningSlot[];
+  /**
+   * Lo calcula NexoPOS con el horario y cualquier pausa manual.
+   *
+   * **`null` no es `false`: es que no sabemos.** Un comercio sin horario cargado no
+   * está cerrado, está sin configurar. Decir "abierto" y que el tipo tenga la
+   * persiana baja manda a alguien a un viaje al pedo (P5, P6) — es el mismo caso que
+   * `availability: unknown`.
+   */
+  isOpenNow: boolean | null;
   /**
    * Un comercio que todavía no publicó tienda tiene cartel, no tienda (D16), y se
    * muestra como no verificado hasta que lo reclame (P5).

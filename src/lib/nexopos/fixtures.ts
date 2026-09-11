@@ -99,6 +99,21 @@ function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
     whatsapp: s.phone,
     logoUrl: s.logoUrl,
     openingHours: s.openingHours,
+    // Lo que decide es esto; el texto de arriba es para leer.
+    schedule: isRotiseria
+      ? [
+          ...[2, 3, 4, 5, 6, 0].flatMap((d) => [
+            { day: d, from: '11:30', to: '14:00' },
+            { day: d, from: '20:00', to: '23:30' },
+          ]),
+        ]
+      : [
+          ...[1, 2, 3, 4, 5, 6].flatMap((d) => [
+            { day: d, from: '08:30', to: '13:00' },
+            { day: d, from: '17:00', to: '21:30' },
+          ]),
+          { day: 0, from: '09:00', to: '13:00' },
+        ],
     isOpenNow: true,
     verified: s.verified,
     storefrontPublished: published,
@@ -141,7 +156,9 @@ const jureHnos: Store = {
   phone: '03537 46-2900',
   whatsapp: '03537 46-2900',
   openingHours: 'Lun a Vie 07:30 a 12:00 y 14:00 a 18:00 | Sáb 08:00 a 12:00',
-  isOpenNow: true,
+  // Sin horario estructurado a propósito: así se ve el caso "no sabemos", que es
+  // el que va a tener cualquier comercio que todavía no lo cargó.
+  isOpenNow: null,
   verified: true,
   storefrontPublished: false,
   slots: [{ id: 'retiro', label: 'Retirar en el local', kind: 'retiro' }],

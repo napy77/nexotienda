@@ -124,8 +124,10 @@ su motivo** — no se esconde: esconderla no le enseña a nadie que existe.
 - Handoff con **token de un solo uso de dos minutos**, que se canja por el
   `accountId` de esa relación. **Nunca un id en la URL**: un id permanente en un link
   es una credencial que no vence nunca. Toda la resolución vive en `src/lib/session.ts`.
-- **Dos credenciales de API**, no una: la de plataforma para el subdominio y el
-  pueblo, la del comercio para su catálogo, sus cuentas y sus pedidos.
+- **Tres credenciales de API separadas por capacidad** —catálogo, pedidos, cuentas—
+  no por comercio: NexoTienda es un solo servidor que renderiza cualquier tienda, no
+  un cliente de un comercio. La de `cuentas` **sola no alcanza**: esos endpoints
+  piden además la sesión del token. La clave dice *qué endpoint*, el token *de quién*.
 - **Nunca** datos personales en query string.
 - El pago usa el Mercado Pago del propio comercio (modelo marketplace, split).
 - **Degradación sin Mercado Pago**: la cuenta corriente sigue funcionando; solo se pierde

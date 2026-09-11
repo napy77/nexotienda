@@ -1,16 +1,26 @@
 /**
  * Adapter HTTP contra la API real de NexoPOS.
  *
- * **Dos credenciales, no una.** Los endpoints de plataforma (resolver un subdominio,
- * el pueblo) no tienen otra credencial posible. Los del comercio —su catálogo, su
- * stock, las cuentas de sus clientes, sus pedidos— van con la clave de ESE comercio.
+ * **Tres claves, separadas por capacidad — no por comercio.**
  *
- * El motivo lo planteó NexoPOS y es correcto: una clave de plataforma que puede leer
- * y escribir la cuenta corriente de cualquier comercio concentra un daño del tamaño
- * del ecosistema entero. Que la libreta de una persona viaje con la misma llave que
- * el buscador del pueblo no cierra.
+ * La primera versión de esto tenía una clave de plataforma y una por comercio. Estaba
+ * mal pensado: NexoTienda es un solo servidor que renderiza la tienda de cualquier
+ * comercio, no es cliente de uno. Manejar N claves no tiene forma.
  *
- * Las dos claves viven solo del lado del servidor. Nunca llegan al navegador.
+ * Lo que separa bien no es *de qué comercio* sino *qué puede hacer*:
+ *
+ * | Clave      | Qué abre                                              |
+ * |------------|-------------------------------------------------------|
+ * | `catalogo` | hosts, stores, pasillos, products, regiones, búsqueda |
+ * | `pedidos`  | crear y leer pedidos, confirmar el cobro              |
+ * | `cuentas`  | la cuenta de una persona en un comercio, y su pago    |
+ *
+ * Y la clave `cuentas` **sola no alcanza**: esos endpoints piden además la sesión que
+ * sale del token de un solo uso de ClubPay. La clave dice *qué endpoint*, el token
+ * dice *de quién*. Una clave filtrada sin token no puede recorrer las cuentas del
+ * pueblo.
+ *
+ * Las tres viven solo del lado del servidor. Nunca llegan al navegador.
  */
 import type {
   AccountEntry,
@@ -26,23 +36,22 @@ import type {
 } from './types';
 
 const BASE = process.env.NEXOPOS_API_URL ?? '';
-const PLATFORM_KEY = process.env.NEXOPOS_PLATFORM_KEY ?? '';
 
-/**
- * La clave del comercio. Hoy sale de env para el piloto de un solo comercio; cuando
- * sean varios, esto se resuelve por `storeId` contra donde las guardemos.
- */
-function merchantKey(_storeId: string): string {
-  return process.env.NEXOPOS_MERCHANT_KEY ?? '';
-}
+const KEYS = {
+  catalogo: process.env.NEXOPOS_KEY_CATALOGO ?? '',
+  pedidos: process.env.NEXOPOS_KEY_PEDIDOS ?? '',
+  cuentas: process.env.NEXOPOS_KEY_CUENTAS ?? '',
+} as const;
 
-async function call<T>(path: string, key: string, init?: RequestInit): Promise<T> {
+type Capacidad = keyof typeof KEYS;
+
+async function call<T>(cap: Capacidad, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
+      Authorization: `Bearer ${KEYS[cap]}`,
       ...init?.headers,
     },
     // El stock cambia con cada venta del mostrador: no lo cacheamos.
@@ -53,52 +62,46 @@ async function call<T>(path: string, key: string, init?: RequestInit): Promise<T
   return (await res.json()) as T;
 }
 
-const platform = <T>(path: string, init?: RequestInit) => call<T>(path, PLATFORM_KEY, init);
-const merchant = <T>(storeId: string, path: string, init?: RequestInit) =>
-  call<T>(path, merchantKey(storeId), init);
+const catalogo = <T>(path: string, init?: RequestInit) => call<T>('catalogo', path, init);
+const pedidos = <T>(path: string, init?: RequestInit) => call<T>('pedidos', path, init);
+const cuentas = <T>(path: string, init?: RequestInit) => call<T>('cuentas', path, init);
 
 export const client: NexoPosPort = {
-  // --- plataforma ---
-  resolveHost: (sub) => platform(`/v1/hosts/${encodeURIComponent(sub)}`),
-  listRegions: () => platform<Region[]>('/v1/regions'),
-  getRegion: (slug) => platform<Region | null>(`/v1/regions/${slug}`),
-  listTownStores: (townSlug) => platform<Store[]>(`/v1/regions/${townSlug}/stores`),
+  // --- catálogo: lo que la tienda le muestra a cualquiera que entre ---
+  resolveHost: (sub) => catalogo(`/v1/hosts/${encodeURIComponent(sub)}`),
+  listRegions: () => catalogo<Region[]>('/v1/regions'),
+  getRegion: (slug) => catalogo<Region | null>(`/v1/regions/${slug}`),
+  listTownStores: (townSlug) => catalogo<Store[]>(`/v1/regions/${townSlug}/stores`),
   searchTown: (townSlug, query) =>
-    platform<TownSearchResult>(`/v1/regions/${townSlug}/search?q=${encodeURIComponent(query)}`),
-
-  // --- del comercio ---
-  getStore: (slug) => platform<Store | null>(`/v1/stores/${encodeURIComponent(slug)}`),
-  listPasillos: (storeId) => merchant<Pasillo[]>(storeId, `/v1/stores/${storeId}/pasillos`),
-  listProducts: (storeId) => merchant<Product[]>(storeId, `/v1/stores/${storeId}/products`),
+    catalogo<TownSearchResult>(`/v1/regions/${townSlug}/search?q=${encodeURIComponent(query)}`),
+  getStore: (slug) => catalogo<Store | null>(`/v1/stores/${encodeURIComponent(slug)}`),
+  listPasillos: (storeId) => catalogo<Pasillo[]>(`/v1/stores/${storeId}/pasillos`),
+  listProducts: (storeId) => catalogo<Product[]>(`/v1/stores/${storeId}/products`),
   getProduct: (storeId, productId) =>
-    merchant<Product | null>(storeId, `/v1/stores/${storeId}/products/${productId}`),
+    catalogo<Product | null>(`/v1/stores/${storeId}/products/${productId}`),
 
-  getAccount: (storeId, accountId) =>
-    merchant<MerchantAccount | null>(storeId, `/v1/stores/${storeId}/accounts/${accountId}`),
-
-  getStatementEntries: (storeId, accountId, statementId) =>
-    merchant<AccountEntry[]>(
-      storeId,
-      `/v1/stores/${storeId}/accounts/${accountId}/statements/${statementId}/entries`,
-    ),
-
+  // --- pedidos: escribe, pero no llega a ninguna cuenta ---
   createOrder: (order: NewOrder) =>
-    merchant<Order>(order.storeId, '/v1/orders', {
-      method: 'POST',
-      body: JSON.stringify(order),
-    }),
-
-  getOrder: (code) => platform<Order | null>(`/v1/orders/${code}`),
-
+    pedidos<Order>('/v1/orders', { method: 'POST', body: JSON.stringify(order) }),
+  getOrder: (code) => pedidos<Order | null>(`/v1/orders/${code}`),
   confirmOrderPayment: (code, paymentId) =>
-    platform<Order | null>(`/v1/orders/${code}/payment`, {
+    pedidos<Order | null>(`/v1/orders/${code}/payment`, {
       method: 'POST',
       body: JSON.stringify({ paymentId }),
     }),
 
+  // --- cuentas: la sensible. Además de la clave, estos endpoints piden la sesión
+  // que sale del token de ClubPay: la clave dice qué endpoint, el token de quién.
+  getAccount: (storeId, accountId) =>
+    cuentas<MerchantAccount | null>(`/v1/stores/${storeId}/accounts/${accountId}`),
+
+  getStatementEntries: (storeId, accountId, statementId) =>
+    cuentas<AccountEntry[]>(
+      `/v1/stores/${storeId}/accounts/${accountId}/statements/${statementId}/entries`,
+    ),
+
   registerAccountPayment: (input) =>
-    merchant<MerchantAccount | null>(
-      input.storeId,
+    cuentas<MerchantAccount | null>(
       `/v1/stores/${input.storeId}/accounts/${input.accountId}/payments`,
       {
         method: 'POST',

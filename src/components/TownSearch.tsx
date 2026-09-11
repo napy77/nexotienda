@@ -6,6 +6,7 @@ import { BadgeCheck, Search, Store as StoreIcon } from 'lucide-react';
 import { money } from '@/lib/format';
 import type { Store, TownSearchHit } from '@/lib/nexopos/types';
 import { availabilityLabel } from './Availability';
+import { openLabel, openState } from '@/lib/horario';
 import { searchTownAction } from '@/app/actions';
 
 /**
@@ -146,7 +147,9 @@ export function TownSearch({
                       {s.name}
                       {s.verified && <BadgeCheck className="h-3.5 w-3.5 text-blue-600" />}
                     </p>
-                    <p className="text-xs text-neutral-500">{s.category}</p>
+                    <p className="text-xs text-neutral-500">
+                      {s.category} · {openLabel(openState(s)).text}
+                    </p>
                     <p className="mt-1 text-xs text-neutral-500">{s.address}</p>
                     {s.storefrontPublished ? (
                       <Link
