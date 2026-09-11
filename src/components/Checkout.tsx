@@ -324,7 +324,13 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
             )}
           </div>
 
-          {!credit.ok && credit.offerContact && (
+          {/*
+            Solo cuando hay una libreta bloqueada que explicar. Si el comercio no da
+            fiado, no hay nada que explicar y el botón queda suelto: un "hablá con
+            el comercio" sin motivo al lado de las formas de pago no se entiende, y
+            encima ya hay uno en el pie.
+          */}
+          {showCredit && !credit.ok && credit.offerContact && (
             <div className="mt-3">
               <ContactButton store={store} className="w-full justify-center" />
             </div>
