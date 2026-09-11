@@ -13,7 +13,7 @@ const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', '
  */
 export type OpenState =
   | { kind: 'abierto' }
-  | { kind: 'cerrado'; abreLabel?: string }
+  | { kind: 'cerrado'; abreLabel?: string; abreEn?: string }
   | { kind: 'desconocido' };
 
 function toMinutes(hhmm: string): number {
@@ -56,7 +56,23 @@ export function openState(
   const { slot, days } = next;
   const cuando =
     days === 0 ? 'hoy' : days === 1 ? 'mañana' : `el ${DIAS[slot.day]}`;
-  return { kind: 'cerrado', abreLabel: `Abre ${cuando} a las ${slot.from}` };
+
+  // Cuánto falta, en palabras. "Abre mañana a las 07:30" no dice si eso es dentro
+  // de una hora o de nueve, y esa diferencia es la que decide si alguien deja un
+  // pedido encargado o se va a otro lado.
+  const abre = new Date(now);
+  abre.setDate(abre.getDate() + days);
+  abre.setHours(Number(slot.from.slice(0, 2)), Number(slot.from.slice(3, 5)), 0, 0);
+  const minutos = Math.max(0, Math.round((abre.getTime() - now.getTime()) / 60000));
+  const horas = Math.round(minutos / 60);
+  const abreEn =
+    minutos < 60
+      ? `en ${minutos} minutos`
+      : horas < 24
+        ? `en ${horas} ${horas === 1 ? 'hora' : 'horas'}`
+        : `en ${Math.round(horas / 24)} días`;
+
+  return { kind: 'cerrado', abreLabel: `Abre ${cuando} a las ${slot.from}`, abreEn };
 }
 
 export function openLabel(state: OpenState): { text: string; tone: 'ok' | 'off' | 'unknown' } {

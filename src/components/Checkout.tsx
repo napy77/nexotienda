@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Banknote, BookMarked, CreditCard, Landmark, Minus, Plus, Trash2 } from 'lucide-react';
+import { Banknote, BookMarked, Clock, CreditCard, Landmark, Minus, Moon, Plus, Trash2 } from 'lucide-react';
 import { money } from '@/lib/format';
 import { creditState } from '@/lib/credit';
+import { openState, type OpenState } from '@/lib/horario';
+import { closedPolicy } from '@/lib/cerrado';
 import type { MerchantAccount, PaymentMethod, Store } from '@/lib/nexopos/types';
 import { placeOrderAction } from '@/app/actions';
 import { useCart } from './CartProvider';
@@ -49,7 +51,27 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
   // que el pedido no se pudo mandar, que él no puede resolver y necesita salida.
   const [error, setError] = useState<string | null>(null);
   const [falla, setFalla] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
   const [pending, start] = useTransition();
+
+  /*
+    Si está abierto se calcula en el cliente y no en el servidor: el HTML de esta
+    página se puede cachear o llegar tarde, y "abre en 3 horas" tiene que ser tres
+    horas desde el reloj de quien está mirando. Arranca en `null` —que se trata como
+    abierto— para que servidor y cliente rendericen lo mismo en la hidratación, y se
+    revisa cada minuto porque alguien puede estar escribiendo la dirección justo a
+    las 7:29.
+  */
+  const [horario, setHorario] = useState<OpenState | null>(null);
+  useEffect(() => {
+    const mirar = () => setHorario(openState(store));
+    mirar();
+    const t = setInterval(mirar, 60_000);
+    return () => clearInterval(t);
+  }, [store]);
+
+  const cierre = closedPolicy(horario ?? { kind: 'abierto' }, cart.lines);
+  const abre = horario?.kind === 'cerrado' ? horario : null;
 
   const slot = store.slots.find((s) => s.id === slotId);
   const freeShipping =
@@ -79,9 +101,16 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
     );
   }
 
-  function submit() {
+  function submit(yaConfirmo = false) {
     setError(null);
     setFalla(null);
+    // Pasa por acá aunque el botón esté deshabilitado: el carrito puede haber
+    // cambiado, o el comercio haber cerrado, entre que se pintó la pantalla y el clic.
+    if (cierre.kind === 'bloqueado') return;
+    if (cierre.kind === 'confirmar' && !yaConfirmo) {
+      setConfirmando(true);
+      return;
+    }
     if (slot?.kind === 'reparto' && address.trim().length < 5) {
       setError('Necesitamos la dirección para llevártelo.');
       return;
@@ -91,6 +120,7 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
       setError('Dejanos tu nombre y un teléfono para poder avisarte.');
       return;
     }
+    setConfirmando(false);
     start(async () => {
       const res = await placeOrderAction({
         storeId: store.id,
@@ -164,6 +194,38 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
       </section>
 
       <aside className="space-y-4">
+        {/*
+          Lo primero que se ve, antes de elegir nada. Enterarse de que no se puede
+          pedir después de cargar la dirección y el teléfono es la peor forma.
+        */}
+        {cierre.kind === 'bloqueado' && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="flex items-center gap-2">
+              <Moon className="h-4 w-4 shrink-0 text-amber-700" />
+              <p className="text-sm font-bold text-amber-900">
+                {store.name} está cerrado
+              </p>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-amber-900">
+              {cierre.items.length === 1
+                ? `${cierre.items[0].name} se hace en el momento`
+                : `${cierre.items.map((i) => i.name).join(', ')} se hacen en el momento`}
+              , así que no se puede encargar para después. {abre?.abreLabel ?? 'Volvé cuando abra'}.
+            </p>
+            <div className="mt-3 space-y-2">
+              {cart.lines.length > cierre.items.length && (
+                <button
+                  onClick={() => cierre.items.forEach((i) => cart.remove(i.id))}
+                  className="w-full rounded-lg bg-amber-900 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-800"
+                >
+                  {cierre.items.length === 1 ? 'Sacarlo' : 'Sacarlos'} y seguir con el resto
+                </button>
+              )}
+              <ContactButton store={store} className="w-full justify-center" />
+            </div>
+          </div>
+        )}
+
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-bold text-neutral-900">¿Cómo lo recibís?</h2>
           <div className="space-y-2">
@@ -373,15 +435,62 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
             </div>
           )}
 
+          {/*
+            Nada de esto impide mandar el pedido: son cosas de góndola y van a estar
+            cuando el comercio abra. Pero que el pedido caiga a las once de la noche y
+            nadie lo mire hasta la mañana tiene que ser una decisión de quien compra,
+            no una sorpresa. Por eso el dato es cuánto falta —"en 9 horas" pesa
+            distinto que "mañana a las 07:30"— y el sí queda escrito con todas las
+            letras.
+          */}
+          {confirmando && cierre.kind === 'confirmar' && (
+            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0 text-amber-700" />
+                <p className="text-sm font-bold text-amber-900">
+                  {store.name} está cerrado ahora
+                </p>
+              </div>
+              <p className="mt-1.5 text-sm leading-relaxed text-amber-900">
+                {abre?.abreEn ? `Abre ${abre.abreEn}` : 'Abre más tarde'}
+                {abre?.abreLabel ? ` (${abre.abreLabel.toLowerCase()})` : ''}. Si lo dejás
+                encargado, lo van a ver al abrir.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => submit(true)}
+                  disabled={pending}
+                  className="flex-1 rounded-lg bg-amber-900 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-800 disabled:opacity-60"
+                >
+                  Dejarlo encargado
+                </button>
+                <button
+                  onClick={() => setConfirmando(false)}
+                  className="rounded-lg border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  Mejor no
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
-            onClick={submit}
-            disabled={pending}
-            className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+            onClick={() => submit()}
+            disabled={pending || cierre.kind === 'bloqueado'}
+            className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pending ? 'Mandando…' : 'Hacer el pedido'}
+            {pending
+              ? 'Mandando…'
+              : cierre.kind === 'bloqueado'
+                ? 'Comercio cerrado'
+                : cierre.kind === 'confirmar'
+                  ? 'Dejar el pedido encargado'
+                  : 'Hacer el pedido'}
           </button>
           <p className="mt-2 text-center text-[11px] text-neutral-500">
-            {store.name} tiene que aceptarlo. Te avisamos cuando lo haga.
+            {cierre.kind === 'confirmar'
+              ? `${store.name} lo va a ver cuando abra. Te avisamos cuando lo acepte.`
+              : `${store.name} tiene que aceptarlo. Te avisamos cuando lo haga.`}
           </p>
         </div>
       </aside>

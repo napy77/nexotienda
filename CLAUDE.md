@@ -119,6 +119,11 @@ su motivo** — no se esconde: esconderla no le enseña a nadie que existe.
   reparto son el mecanismo que hace rentable el reparto propio, no una limitación.
 - Reparto escalonado: retiro en local → reparto propio con costo → remis del pueblo (D21).
   **No construimos flota.**
+- **Con el comercio cerrado, el que decide es el producto, no el rubro.** Todo `stock`
+  se puede encargar, avisando cuánto falta para que abra y con el sí escrito. Si hay
+  una línea `declared`, no se puede pedir: lo que el comercio declaró era de hoy.
+  `unknown` no bloquea nada — no saber no es saber que no hay (P5).
+  Está en `src/lib/cerrado.ts`.
 
 ## Integración con ClubPay
 
