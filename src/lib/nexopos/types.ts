@@ -43,7 +43,20 @@ export interface Product {
   name: string;
   brand?: string;
   description?: string;
+  /** La portada: la que va en la tarjeta, en el carrito y en el link de WhatsApp. */
   imageUrl?: string;
+  /**
+   * La galería completa, **con la portada primero**, tal como la arma NexoPOS.
+   *
+   * Nunca es `null` ni `undefined`: un producto sin fotos llega con `[]`. Eso lo
+   * garantiza el adapter, no el cable —NexoTienda despliega independiente de
+   * NexoPOS y una versión sin el campo no puede romper el catálogo entero—.
+   *
+   * Que venga ya ordenada es a propósito: si cada pantalla armara
+   * `[imageUrl, ...resto]` por su cuenta, la misma decisión se repite hasta que
+   * alguna la hace distinto.
+   */
+  images: string[];
   /** Precio en centavos, para no arrastrar floats por todo el sistema. */
   priceCents: number;
   listPriceCents?: number;

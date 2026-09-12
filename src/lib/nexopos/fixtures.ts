@@ -68,6 +68,7 @@ function mapProduct(p: (typeof INITIAL_PRODUCTS)[number]): Product {
     brand: p.brand,
     description: p.description,
     imageUrl: p.imageUrl,
+    images: [p.imageUrl, ...(p.extraImages ?? [])].filter(Boolean),
     priceCents: money(p.price),
     listPriceCents: p.originalPrice ? money(p.originalPrice) : undefined,
     unit: p.unit,

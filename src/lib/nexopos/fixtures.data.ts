@@ -5,7 +5,7 @@
 interface Product {
   id: string; name: string; brand: string; pasilloId: string; subCategory: string;
   price: number; originalPrice?: number; discountPercentage?: number; unit: string;
-  imageUrl: string; type: 'canonico' | 'propio'; ean?: string; stock: number;
+  imageUrl: string; extraImages?: string[]; type: 'canonico' | 'propio'; ean?: string; stock: number;
   dailyQuota?: number; quotaRemaining?: number; isOffer?: boolean; packTag?: string;
   storeId: string; storeName: string; description?: string;
 }
@@ -183,6 +183,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     discountPercentage: 18,
     unit: 'Pack 24 un.',
     imageUrl: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=600&q=80',
+    extraImages: [
+      'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?w=600&q=80',
+      'https://images.unsplash.com/photo-1618183479302-1e0aa382c36b?w=600&q=80',
+      'https://images.unsplash.com/photo-1595475207225-428b62bda831?w=600&q=80',
+    ],
     type: 'canonico',
     ean: '7790895000452',
     stock: 35,
@@ -203,6 +208,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     discountPercentage: 19,
     unit: '100g',
     imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&q=80',
+    extraImages: ['https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600&q=80'],
     type: 'canonico',
     ean: '7613035334190',
     stock: 28,

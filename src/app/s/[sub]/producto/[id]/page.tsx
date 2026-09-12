@@ -7,6 +7,7 @@ import { money } from '@/lib/format';
 import { AvailabilityNote } from '@/components/Availability';
 import { AddToCart } from '@/components/AddToCart';
 import { StoreShell } from '@/components/StoreShell';
+import { ProductGallery } from '@/components/ProductGallery';
 
 type Props = { params: Promise<{ sub: string; id: string }> };
 
@@ -27,7 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${product.name} — ${money(product.priceCents)}`,
       description: `En ${store.name}, ${store.town}`,
-      images: product.imageUrl ? [product.imageUrl] : undefined,
+      // Todas: WhatsApp toma la primera, pero el resto sirve en otros lados.
+      images: product.images.length ? product.images : undefined,
     },
   };
 }
@@ -50,18 +52,7 @@ export default async function ProductoPage({ params }: Props) {
       </Link>
 
       <div className="grid gap-6 rounded-xl border border-neutral-200 bg-white p-5 md:grid-cols-2 md:p-8">
-        <div className="flex items-center justify-center rounded-lg bg-neutral-50 p-6">
-          {product.imageUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="max-h-96 w-full object-contain"
-            />
-          ) : (
-            <span className="text-sm text-neutral-400">Sin foto</span>
-          )}
-        </div>
+        <ProductGallery images={product.images} alt={product.name} />
 
         <div className="flex flex-col">
           {product.brand && (

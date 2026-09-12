@@ -172,6 +172,32 @@ function mapStore(w: StoreWire): Store {
   };
 }
 
+/**
+ * Lo que el cable manda de un producto.
+ *
+ * `images` es opcional **acá y solo acá**. NexoPOS lo agregó y dice que nunca es
+ * nulo, y les creemos; pero NexoTienda y NexoPOS se despliegan por separado, y una
+ * versión de la API sin el campo no puede tirar abajo el catálogo de todas las
+ * tiendas. El dominio recibe la garantía; el adapter se come la duda.
+ */
+type ProductWire = Omit<Product, 'images'> & { images?: unknown };
+
+function mapProduct(w: ProductWire): Product {
+  const galeria = Array.isArray(w.images)
+    ? w.images.filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : [];
+
+  // La portada va primero. Si ya viene en la lista —que es lo que NexoPOS hace— el
+  // Set la deja donde está y no la duplica. NexoB2B usa la convención contraria
+  // (portada aparte, fuera del arreglo) y este es justo el lugar donde esa
+  // diferencia se termina.
+  const images = [...new Set(w.imageUrl ? [w.imageUrl, ...galeria] : galeria)];
+
+  // Y al revés: un producto con fotos de catálogo y sin portada propia igual tiene
+  // qué mostrar en la tarjeta.
+  return { ...w, images, imageUrl: w.imageUrl ?? images[0] };
+}
+
 // ---------------------------------------------------------------------------
 
 export const client: NexoPosPort = {
@@ -201,9 +227,16 @@ export const client: NexoPosPort = {
     catalogo<TownSearchResult>(`/v1/towns/${townSlug}/search?q=${encodeURIComponent(query)}`),
 
   listPasillos: (storeId) => catalogo<Pasillo[]>(`/v1/stores/${storeId}/pasillos`),
-  listProducts: (storeId) => catalogo<Product[]>(`/v1/stores/${storeId}/products`),
-  getProduct: (storeId, productId) =>
-    catalogo<Product | null>(`/v1/stores/${storeId}/products/${productId}`),
+  async listProducts(storeId) {
+    const ws = await catalogo<ProductWire[]>(`/v1/stores/${storeId}/products`);
+    return (ws ?? []).map(mapProduct);
+  },
+  async getProduct(storeId, productId) {
+    const w = await catalogo<ProductWire | null>(
+      `/v1/stores/${storeId}/products/${productId}`,
+    );
+    return w ? mapProduct(w) : null;
+  },
 
   // --- pedidos: escribe, pero no llega a ninguna cuenta ---
   createOrder: (order: NewOrder) =>
