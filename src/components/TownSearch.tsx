@@ -106,8 +106,14 @@ export function TownSearch({
                   No lo encontramos cargado en {townName}
                 </p>
                 <p className="mt-1 text-sm text-neutral-500">
-                  Puede que algún comercio lo tenga sin subir todavía. Probá preguntando
-                  directamente.
+                  {/*
+                    "Sin subir" era el único motivo posible; ahora hay dos, porque un
+                    comercio puede tenerlo cargado y mostrar solo lo que hay en la
+                    góndola. Las dos razones caben en "no lo está mostrando", y
+                    ninguna de las dos afirma que no lo tenga.
+                  */}
+                  Puede que algún comercio lo tenga y no lo esté mostrando. Probá
+                  preguntando directamente.
                 </p>
               </div>
             ) : (

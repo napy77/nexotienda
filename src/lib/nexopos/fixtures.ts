@@ -43,6 +43,13 @@ const SLUGS: Record<string, string> = {
 /** Comercios que además tienen tienda publicada. El resto tiene cartel (D16). */
 const PUBLISHED = new Set(['store-supersol', 'store-donarosa']);
 
+/**
+ * El que apagó "mostrar lo que no tengo". El caso es el del que importó el catálogo
+ * mayorista entero y tiene una fracción en la góndola: la ferretería, no el almacén.
+ * NexoPOS filtra del lado de ellos; acá se emula para que el modo fixture no mienta.
+ */
+const HIDES_OUT_OF_STOCK = new Set(['store-ferreteria']);
+
 const money = (pesos: number) => Math.round(pesos * 100);
 
 function mapAvailability(p: (typeof INITIAL_PRODUCTS)[number]): Availability {
@@ -85,6 +92,24 @@ function mapProduct(p: (typeof INITIAL_PRODUCTS)[number]): Product {
   };
 }
 
+/**
+ * Lo que la tienda muestra. Con el tilde apagado, lo agotado no viaja —igual que
+ * hace NexoPOS antes de responder—. `unknown` nunca se esconde: no saber no es no
+ * tener, y esconder por las dudas le tapa la venta a un comercio que lo tiene (P5).
+ */
+function visibles(storeId: string): Product[] {
+  const delComercio = products.filter((p) => p.storeId === storeId && p.publishedInStore);
+  if (!HIDES_OUT_OF_STOCK.has(storeId)) return delComercio;
+
+  return delComercio.filter((p) => {
+    const a = p.availability;
+    if (a.policy === 'stock') return a.onHand > 0;
+    // El cupo agotado también se esconde: "quedan 0 de hoy" es no tener.
+    if (a.policy === 'declared') return a.state === 'available' && (!a.quota || a.quota.remaining > 0);
+    return true;
+  });
+}
+
 function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
   const published = PUBLISHED.has(s.id);
   const isRotiseria = s.id === 'store-donarosa';
@@ -121,6 +146,7 @@ function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
     isOpenNow: true,
     verified: s.verified,
     storefrontPublished: published,
+    showsOutOfStock: !HIDES_OUT_OF_STOCK.has(s.id),
     // Retiro siempre; el reparto va por franjas, que es lo que lo hace rentable (D20, D21).
     slots: [
       { id: 'retiro', label: 'Retirar en el local', kind: 'retiro' },
@@ -165,6 +191,7 @@ const jureHnos: Store = {
   isOpenNow: null,
   verified: true,
   storefrontPublished: false,
+  showsOutOfStock: true,
   slots: [{ id: 'retiro', label: 'Retirar en el local', kind: 'retiro' }],
   // Sin Mercado Pago: la libreta sigue funcionando, solo se cae el pago online.
   acceptedPayments: ['efectivo_entrega', 'cuenta_corriente'],
@@ -292,12 +319,12 @@ export const fixtures: NexoPosPort = {
   },
 
   async listPasillos(storeId) {
-    const ids = new Set(products.filter((p) => p.storeId === storeId).map((p) => p.pasilloId));
+    const ids = new Set(visibles(storeId).map((p) => p.pasilloId));
     return (PASILLOS as Pasillo[]).filter((p) => ids.has(p.id));
   },
 
   async listProducts(storeId) {
-    return products.filter((p) => p.storeId === storeId && p.publishedInStore);
+    return visibles(storeId);
   },
 
   async getProduct(storeId, productId) {

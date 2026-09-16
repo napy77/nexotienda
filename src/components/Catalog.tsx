@@ -73,12 +73,22 @@ export function Catalog({
       </div>
 
       {shown.length === 0 ? (
+        /*
+          Nunca decimos que el comercio no lo tiene (P5), pero el motivo de que no
+          aparezca no es el mismo en los dos casos y echarle la culpa al que no
+          corresponde confunde. Con la tienda completa, lo que falta es que lo suba.
+          Con "mostrar solo lo que tengo" encendido, el producto puede estar
+          perfectamente cargado y no aparecer porque hoy no está en la góndola: eso
+          no es un catálogo incompleto, es una decisión del comerciante, y se dice.
+        */
         <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-neutral-800">
-            No encontramos nada cargado con eso
+            No encontramos nada con eso
           </p>
           <p className="mt-1 text-sm text-neutral-500">
-            Puede que {store.name} lo tenga y todavía no lo haya subido. Preguntale.
+            {store.showsOutOfStock
+              ? `Puede que ${store.name} lo tenga y todavía no lo haya subido. Preguntale.`
+              : `${store.name} muestra en la tienda solo lo que tiene ahora. Puede que lo consiga — preguntale.`}
           </p>
         </div>
       ) : (

@@ -120,6 +120,7 @@ interface StoreWire {
   isOpenNow: boolean | null;
   verified: boolean;
   storefrontPublished: boolean;
+  showsOutOfStock?: boolean;
   slots: { id: string; label: string; kind: 'retiro' | 'reparto'; feeCents?: number }[];
   freeDeliveryOverCents?: number;
   acceptsOnlinePayment: boolean;
@@ -165,6 +166,9 @@ function mapStore(w: StoreWire): Store {
     isOpenNow: w.isOpenNow,
     verified: w.verified,
     storefrontPublished: w.storefrontPublished,
+    // Ante la ausencia, mostrar. Es el default de ellos y es el que no esconde
+    // mercadería por un campo que no llegó.
+    showsOutOfStock: w.showsOutOfStock ?? true,
     slots: w.slots,
     freeDeliveryOverCents: w.freeDeliveryOverCents,
     acceptedPayments,

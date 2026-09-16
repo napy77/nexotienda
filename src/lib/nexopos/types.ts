@@ -206,6 +206,24 @@ export interface Store {
    */
   verified: boolean;
   storefrontPublished: boolean;
+  /**
+   * Si la tienda muestra lo que no tiene.
+   *
+   * `true` es el default y lo que hace casi todo almacén: mostrar el producto
+   * agotado es la venta de pasado mañana —"acá esto se consigue"— y el cartelito
+   * de "sin stock por ahora" lo dice sin mentir.
+   *
+   * `false` lo enciende el que importó tres mil artículos del catálogo mayorista
+   * y tiene cuatrocientos en la góndola. Esa tienda abierta es pantallas enteras
+   * de "No disponible", y una tienda así parece cerrada.
+   *
+   * **El filtrado lo hace NexoPOS, no nosotros**: la lista llega ya corta. Acá el
+   * campo sirve para no prometer lo que no se puede cumplir — un filtro de
+   * "ver los agotados" que no traería nada, o un "no lo encontramos" que le echa
+   * la culpa a un catálogo incompleto cuando en realidad es una decisión del
+   * comercio.
+   */
+  showsOutOfStock: boolean;
   /** Retiro en local siempre; reparto propio solo si lo habilitó (D21, D22). */
   slots: FulfillmentSlot[];
   /** Mínimo para envío gratis, si el comercio lo configuró. */
