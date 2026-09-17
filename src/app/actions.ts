@@ -191,51 +191,30 @@ export async function productsByIdAction(storeId: string, ids: string[]) {
 // ---------------------------------------------------------------------------
 
 /**
- * Empareja la pantalla grande con la app.
+ * La persona tipea acá el código que le mostró ClubPay en el teléfono.
  *
- * El `requestId` **queda en una cookie `httpOnly` de este navegador y no vuelve al
- * cliente**. Es lo que ata la aprobación a esta pantalla: aunque alguien apruebe un
- * pedido que no es suyo, solo el navegador que lo abrió puede canjearlo. Sin eso, un
- * código dictado por teléfono le abriría la libreta a cualquiera.
- */
-export async function abrirEmparejamientoAction(storeId: string, storeSlug: string) {
-  const par = await nexopos.openPairing(storeId);
-  if (!par) return null;
-
-  const jar = await cookies();
-  jar.set(`nt_par_${storeSlug}`, par.requestId, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 5 * 60,
-  });
-
-  // El requestId no se devuelve: la pantalla solo necesita mostrar el código.
-  return { code: par.code, expiresAt: par.expiresAt };
-}
-
-/**
- * ¿Ya lo aprobaron? Si sí, canjea el token y abre la libreta acá.
- *
- * Termina en el **mismo canje** que el handoff desde la app. Una segunda forma de
+ * Termina en el **mismo canje** que el handoff desde la app: una segunda forma de
  * abrir sesión sería una segunda superficie que auditar, y esta es la parte del
  * sistema donde eso menos conviene.
+ *
+ * **El límite de intentos es de ClubPay**, que es quien tiene el código. Acá no hay
+ * dónde contarlos —NexoTienda no guarda estado— y contarlos mal sería peor que no
+ * contarlos: daría la sensación de que el problema está cubierto.
  */
-export async function consultarEmparejamientoAction(
+export async function canjearCodigoAction(
   storeId: string,
   storeSlug: string,
-): Promise<'pendiente' | 'listo' | 'vencido'> {
+  code: string,
+): Promise<'listo' | 'no_sirve'> {
+  if (!code || code.trim().length < 4) return 'no_sirve';
+
+  const token = await nexopos.redeemPairingCode(storeId, code);
+  if (!token) return 'no_sirve';
+
+  const sesion = await nexopos.redeemLinkToken(token, storeId);
+  if (!sesion || sesion.storeId !== storeId) return 'no_sirve';
+
   const jar = await cookies();
-  const requestId = jar.get(`nt_par_${storeSlug}`)?.value;
-  if (!requestId) return 'vencido';
-
-  const r = await nexopos.pollPairing(storeId, requestId);
-  if (r.status !== 'listo') return r.status;
-
-  const sesion = await nexopos.redeemLinkToken(r.token, storeId);
-  if (!sesion || sesion.storeId !== storeId) return 'vencido';
-
   jar.set(
     sessionCookieName(storeSlug),
     sessionCookieValue({
@@ -245,6 +224,5 @@ export async function consultarEmparejamientoAction(
     }),
     sessionCookieOptions,
   );
-  jar.delete(`nt_par_${storeSlug}`);
   return 'listo';
 }

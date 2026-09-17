@@ -1,116 +1,100 @@
 # ClubPay → abrir la libreta en la computadora
 
 > **Para el equipo de ClubPay.** Este archivo se manda tal cual.
+>
+> *Reemplaza a la versión anterior, que tenía el código naciendo en la computadora. Si
+> ya empezaron con esa, paren: la dirección se invirtió y quedó más simple.*
 
-> ⚠️ **No construyan todavía.** Estamos evaluando invertir la dirección del código: que
-> lo genere la app y se tipee en la computadora, en lugar de al revés. Sería **un solo
-> endpoint en vez de dos y sin sondeo**, y pone el aviso de seguridad sobre una acción
-> que la gente ya tiene aprendida —"nunca dictes tu código"— en vez de sobre una que se
-> siente inofensiva. Les avisamos en cuanto esté decidido. El resto del documento
-> describe la versión de hoy.
+El caso: **la tienda abierta en la computadora de casa y ClubPay en el celular.** El
+handoff que armamos no sirve ahí —abre la tienda *en el teléfono*— y la computadora no
+tiene forma de demostrar quién es.
 
-Apareció probando: **la tienda abierta en la computadora de casa y ClubPay en el
-celular.** El handoff que armamos no sirve ahí —abre la tienda *en el teléfono*— y la
-computadora no tiene forma de demostrar quién es.
-
-Hoy, en esa situación, la libreta no se puede usar. Se puede comprar pagando al
-recibirlo, nada más.
+Hoy, en esa situación, la libreta no se puede usar.
 
 ---
-
-## Lo que proponemos: un código corto, no un QR
-
-Sabemos que el QR estaba sobre la mesa, y que ustedes avisaron que la cámara hoy solo
-sirve para cobrar. **Con un código de cinco caracteres no hace falta cámara.** Y hay
-una razón mejor que la del costo:
-
-**Un código que hay que leer de tu propia pantalla no se reenvía por WhatsApp.** Una
-imagen de QR sí. Para tipear estas cinco letras hay que estar mirando esa computadora.
-
-El QR queda como mejora para después, sobre el mismo mecanismo: sería el mismo pedido,
-mostrado de otra forma.
 
 ## El circuito
 
 ```
-1. La compu pide un código    NexoTienda → NexoPOS → ClubPay
-                              → { requestId, code: "VRCCX", expiresAt }
+1. En el teléfono    ClubPay → Mis comercios → Jure Hnos SRL
+                     → "Entrar en otra pantalla"
+                     → la app muestra:  VRCCX
 
-2. La persona lee "VRCCX" en la pantalla grande
+2. En la computadora la persona lo tipea en la tienda
 
-3. En el teléfono             ClubPay → Mis comercios → Jure Hnos SRL
-                              → "Entrar en otra pantalla" → escribe VRCCX → confirma
+3. La tienda canjea  NexoTienda → NexoPOS → ClubPay
+                     { storeId, code }  →  { token }
 
-4. La compu pregunta cada 3s  NexoTienda → NexoPOS → ClubPay
-                              → { status: "listo", token: "…" }
-
-5. Se canja                   el MISMO token de un solo uso del handoff que ya existe
+4. Se abre la sesión con el MISMO token de un solo uso del handoff que ya existe
 ```
 
-**El paso 5 es a propósito.** Termina en el canje que ya construimos y ya probamos: una
-segunda forma de abrir sesión sería una segunda superficie que auditar, y esta es la
-parte del sistema donde eso menos conviene.
+Nada de sondeo, nada de pedidos pendientes: la compu manda el código y recibe el token,
+o no. **El paso 4 es a propósito**: termina en el canje que ya construimos y probamos.
+Una segunda forma de abrir sesión sería una segunda superficie que auditar, y esta es
+la parte del sistema donde eso menos conviene.
 
-De este lado ya está todo construido y andando contra datos de prueba: la pantalla
-pide el código, lo muestra, espera, y cuando se aprueba la libreta se abre sola.
+De este lado ya está construido y andando: la pantalla de libreta, cuando no hay
+sesión, ofrece un campo para el código y abre la libreta al tipearlo.
+
+## Por qué el código nace en la app y no en la computadora
+
+Nuestra primera versión lo tenía al revés, y el equipo de NexoPOS nos mostró por qué
+estaba mal. Vale la pena que lo sepan porque es el motivo de toda la forma:
+
+**El ataque de un mecanismo así no es que le roben el código a alguien.** Es que el
+atacante abra el pedido en *su* computadora y convenza a la víctima de meter *ese*
+código en su ClubPay.
+
+Con el código naciendo en la compu, lo que le pedimos a la persona es *"escribí este
+código en tu app"* — una acción que se siente tan inofensiva como emparejar un
+televisor, y contra la que nadie fue entrenado nunca.
+
+Con el código naciendo en la app, el atacante necesita que la víctima **le dicte** un
+código que tiene en su teléfono. Y eso sí tiene diez años de entrenamiento encima:
+*"nunca le des tu código a nadie"* lo repiten todos los bancos del país.
+
+**No elimina el ataque: lo muda a un terreno donde la gente ya está parada.** Es todo
+lo que se puede decir con honestidad de un mecanismo de emparejar pantallas, y
+preferimos decirlo así antes que prometer de más.
 
 ## Lo que les toca
 
-**Una pantalla nueva en la app**: "Entrar en otra pantalla", dentro del comercio en Mis
-comercios. Un campo para el código y una confirmación.
+**Una pantalla en la app**: "Entrar en otra pantalla", dentro del comercio en Mis
+comercios. Muestra el código y **el aviso al lado**, que es donde la persona está
+mirando:
 
-**Dos endpoints**, que NexoPOS les va a llamar (nosotros no hablamos con ustedes
-directo, por lo mismo de siempre: no tenemos ni podemos tener la clave de cada
-comercio):
+> **VRCCX**
+> Este código abre tu libreta de Jure Hnos SRL en otra pantalla.
+> Nadie de Jure ni de ClubPay te lo va a pedir. Si alguien te lo pide, no se lo des.
+
+**Un endpoint**, que va a llamar NexoPOS con la clave de ese comercio (nosotros no
+hablamos con ustedes directo, por lo de siempre: no tenemos ni podemos tener una clave
+por comercio):
 
 ```
-POST  …/emparejar            { storeId }        → { requestId, code, expiresAt }
-GET   …/emparejar/:requestId                    → { status: "pendiente" }
-                                                | { status: "listo", token }
-                                                | { status: "vencido" }
-POST  …/emparejar/aprobar    { code }           ← lo llama la app, con la sesión de la persona
+POST …/emparejar/canjear   { code, storeId }   →  { token }
 ```
 
-El `token` de "listo" es exactamente el mismo que emite hoy
-`POST /me/merchants/:vinculacion_id/tienda`. No hace falta uno nuevo.
+El `token` es el mismo que emite hoy `POST /me/merchants/:vinculacion_id/tienda`. No
+hace falta uno nuevo.
 
-## La parte delicada, que es la pantalla de confirmación
+Tres detalles:
 
-Este mecanismo tiene un ataque, y **toda la defensa está en cómo esté redactada esa
-pantalla**.
+- **El código nace atado a una relación y a un comercio.** Si `storeId` no coincide,
+  rechácenlo: así un código de Jure tipeado en la tienda de Delfín falla solo.
+- **Cinco minutos y un solo uso.** El tiempo de caminar del teléfono al escritorio.
+- **Límite de intentos.** Cinco caracteres se prueban a mano si se puede intentar mil
+  veces. **Este límite solo lo pueden poner ustedes**: NexoTienda no guarda estado y
+  contarlos mal sería peor que no contarlos, porque daría la sensación de que el
+  problema está cubierto.
 
-No es que alguien le robe el código a la víctima: el código aparece en la pantalla del
-que lo pidió. **El ataque es al revés** — el atacante abre el pedido en *su* compu y
-convence a la víctima de que escriba *ese* código en *su* ClubPay. Si la víctima
-confirma, la libreta se abre en la computadora del atacante.
+Y una sugerencia sobre el alfabeto: **sin vocales**, para que no se arme ninguna
+palabra sola, y sin 0 ni O. Nosotros usamos `34679BCDFGHJKLMNPQRSTVWXZ`.
 
-Así que la pantalla no puede decir "¿Confirmás?". Tiene que decir qué está pasando:
+## Lo que ya no hace falta
 
-> **Alguien está abriendo tu libreta de Jure Hnos SRL en otra pantalla.**
-> Si no sos vos, no confirmes. Nadie de Jure ni de ClubPay te va a pedir este código.
-
-Mandamos también una descripción del que pide —"una computadora con Chrome"— **pero
-no la traten como prueba de nada.** En este ataque el que abre el pedido es el
-atacante, así que esa cadena la escribe él: nada le impide poner "tu iPhone". Sirve en
-el caso honesto —"sí, es mi compu"— y como color en la pantalla. Nada más.
-
-Lo único que ahí no controla el atacante es **el nombre del comercio**, porque ustedes
-lo deducen de la clave y no de lo que les mandamos, y **la pregunta**: "si no fuiste
-vos, no confirmes" no depende de ningún dato de nadie. La confirmación tiene que
-apoyarse en esos dos.
-
-Tres cosas más, cortas:
-
-- **Tres minutos de vida** y un solo uso, como el token.
-- **Límite de intentos por cuenta.** Cinco caracteres alcanzan si no se puede probar
-  mil veces.
-- **Sin vocales en el alfabeto del código**, para que no se arme ninguna palabra sola y
-  para no confundir 0 con O. Nosotros usamos `34679BCDFGHJKLMNPQRSTVWXZ`; si el código
-  lo generan ustedes, va de sugerencia.
-
-## Una que ya hicimos y no necesitan
-
-El `requestId` **no vuelve al navegador**: queda en una cookie `httpOnly` de la
-computadora que lo pidió. Aunque alguien apruebe un pedido que no es suyo, **solo el
-navegador que lo abrió puede canjearlo**. No hace falta que hagan nada con eso, pero
-conviene que lo sepan al pensar los bordes.
+De la versión anterior caen: el pedido pendiente, el estado "pendiente/listo/vencido",
+el sondeo, y la descripción del dispositivo. Esa última la habíamos propuesto como
+defensa y **no lo era** —en ese ataque el que abre el pedido es el atacante, así que
+esa cadena la escribía él—. Con la dirección invertida no hay dónde ponerla ni hace
+falta.

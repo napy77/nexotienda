@@ -6,6 +6,7 @@ import { money, longDate } from '@/lib/format';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { PayAccount } from '@/components/PayAccount';
 import { EntrarEnEstaPantalla } from '@/components/EntrarEnEstaPantalla';
+import { LibretaBar } from '@/components/LibretaBar';
 
 /**
  * La libreta CON ESTE COMERCIO.
@@ -32,7 +33,7 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
   const { sub } = await params;
   const store = await nexopos.getStore(sub);
   if (!store) notFound();
-  const { account } = await libretaDeLaSesion(store);
+  const { account, displayName } = await libretaDeLaSesion(store);
 
   if (!account) {
     return (
@@ -70,6 +71,13 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
 
   return (
     <StoreShell store={store}>
+      {/*
+        De quién es y cómo se cierra, también acá. Faltaba: se podía ver la deuda de
+        alguien en el teléfono de la casa sin ninguna forma de cerrarla desde la misma
+        pantalla donde estaba a la vista.
+      */}
+      <LibretaBar store={store} accountName={displayName} />
+
       <h1 className="mb-1 text-2xl font-black tracking-tight text-neutral-900">
         Tu libreta con {store.name}
       </h1>

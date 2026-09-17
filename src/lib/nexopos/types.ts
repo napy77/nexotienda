@@ -410,33 +410,22 @@ export interface LinkSession {
 /**
  * Abrir la libreta en una pantalla que no es la del teléfono.
  *
- * El caso: la tienda abierta en la computadora de casa y ClubPay en el celular. Con
- * el handoff de la app no alcanza —abre la tienda *en el teléfono*— y no hay forma de
- * que la PC demuestre quién es.
+ * El caso: la tienda abierta en la computadora de casa y ClubPay en el celular. El
+ * handoff de la app no alcanza —abre la tienda *en el teléfono*— y la computadora no
+ * tiene forma de demostrar quién es.
  *
- * El mecanismo es el de emparejar dos pantallas, y **la primera versión usa un código
- * corto y no un QR**. Nadie escanea la pantalla de su propia compu con la compu, así
- * que el QR obliga al teléfono, y eso pide trabajo de cámara del lado de ClubPay que
- * hoy solo existe para cobrar. Un código de cinco caracteres que se lee de una
- * pantalla y se tipea en la otra no necesita nada de eso.
+ * **El código nace en la app y se tipea en la computadora**, no al revés. La
+ * diferencia parece de forma y es de fondo: al revés, el ataque es que alguien te
+ * muestre *su* código y te convenza de tipearlo en tu app — una acción que se siente
+ * tan inofensiva como emparejar un televisor. Así, el ataque necesita que le **dictes**
+ * un código que tenés en tu teléfono, que es contra lo que todos los bancos del país
+ * vienen entrenando a la gente hace diez años.
  *
- * Y tiene una propiedad que el QR no: **un código que hay que leer de tu propia
- * pantalla no se reenvía por WhatsApp.** Una imagen de QR sí, y ahí alguien te hace
- * abrir tu libreta en la pantalla de otro.
+ * No elimina el ataque: lo muda a un terreno donde la gente ya está parada.
+ *
+ * Y de paso desaparecen el sondeo, el pedido pendiente y la cookie que lo ataba: la
+ * computadora manda el código y recibe el token, o no.
  */
-export interface Pairing {
-  /** Lo guarda el navegador que lo pidió. Sin esto, la aprobación no sirve. */
-  requestId: string;
-  /** Lo que la persona lee en la pantalla grande y tipea en la app. */
-  code: string;
-  expiresAt: string;
-}
-
-export type PairingStatus =
-  | { status: 'pendiente' }
-  /** Aprobado desde la app: viene el mismo token de un solo uso del handoff. */
-  | { status: 'listo'; token: string }
-  | { status: 'vencido' };
 
 export interface MerchantAccount {
   /** Id de la relación persona–comercio. Solo existe si la vinculación fue aceptada. */
@@ -717,12 +706,12 @@ export interface NexoPosPort {
    */
   redeemLinkToken(token: string, storeId: string): Promise<LinkSession | null>;
   /**
-   * Abre un pedido de emparejamiento para esta tienda. Devuelve `null` si todavía
-   * no existe del otro lado: la pantalla ofrece el camino por el teléfono y listo.
+   * Canjea el código que la app le mostró a la persona por el token de un solo uso
+   * del handoff. `null` si el código no sirve —mal tipeado, vencido, ya usado, de
+   * otro comercio— sin distinguir cuál: al que está tipeando le da igual, y
+   * distinguirlo le cuenta algo a quien esté probando códigos ajenos.
    */
-  openPairing(storeId: string): Promise<Pairing | null>;
-  /** ¿Ya lo aprobaron desde la app? */
-  pollPairing(storeId: string, requestId: string): Promise<PairingStatus>;
+  redeemPairingCode(storeId: string, code: string): Promise<string | null>;
 
   /**
    * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.

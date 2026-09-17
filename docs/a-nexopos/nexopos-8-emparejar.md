@@ -1,57 +1,65 @@
 # NexoPOS → abrir la libreta en otra pantalla
 
 > **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+>
+> *Reemplaza a la versión anterior. Tenían razón con el `device`, y al corregirlo
+> quedó claro que había que invertir la dirección: sus dos endpoints se vuelven uno.*
 
-Un caso que apareció probando y que no cubre el handoff: **la tienda abierta en la
-computadora de casa y ClubPay en el celular.** El handoff abre la tienda *en el
-teléfono*, y la computadora no tiene forma de demostrar quién es.
-
-La solución es emparejar las dos pantallas con un código corto —no un QR: nadie
-escanea su propia compu, y el código además no se reenvía por WhatsApp—. **El pedido
-grande va para ClubPay**, que es quien tiene la app y la sesión de la persona. A
-ustedes les toca ser el paso del medio, como en el canje.
+El caso: **la tienda abierta en la computadora de casa y ClubPay en el celular.** El
+handoff abre la tienda *en el teléfono*, y la computadora no tiene forma de demostrar
+quién es.
 
 ---
 
-## Los dos endpoints, que son pase de pelota
+## El endpoint, que es pase de pelota
 
 ```
-POST /v1/cuentas/emparejar              (clave `cuentas`)
-{ "storeId": "12" }
-→ { "requestId": "…", "code": "VRCCX", "expiresAt": "…" }
+POST /v1/cuentas/emparejar/canjear        (clave `cuentas`)
+{ "storeId": "12", "code": "VRCCX" }
+→ { "token": "…" }
     ↳ se lo piden a ClubPay con la clave de ESE comercio, la que ya tienen
 
-GET  /v1/cuentas/emparejar/:requestId?storeId=12     (clave `cuentas`)
-→ { "status": "pendiente" }
-| { "status": "listo", "token": "…" }
-| { "status": "vencido" }
-    ↳ el `token` es el mismo de un solo uso del handoff: lo canjeamos con
-      POST /v1/cuentas/canjear, que ya existe y ya funciona
+… y el token lo canjeamos con POST /v1/cuentas/canjear, que ya existe y ya funciona
 ```
 
-Es la misma forma que el canje y por el mismo motivo: nosotros no tenemos ni podemos
-tener la clave de cada comercio, ustedes sí.
+**Uno solo.** Caen el pedido pendiente, el estado y el sondeo: el código lo genera la
+app, la computadora lo manda, y vuelve el token o un error.
 
-**Y termina en el canje que ya construimos**, no en una sesión nueva. Una segunda
-forma de abrir sesión sería una segunda superficie que auditar.
+El `storeId` viaja por lo mismo que en el canje: el código no dice de qué comercio es,
+y nosotros siempre lo sabemos porque esto pasa en el subdominio de ese comercio.
+
+## Por qué se invirtió
+
+Por lo que ustedes escribieron. Si el `device` no es prueba de nada —y no lo es, lo
+escribe el atacante— la defensa entera era una frase, sobre una acción que **no tiene
+ninguna defensa cultural**: *"escribí este código en tu app"* se siente como emparejar
+un televisor.
+
+Con el código naciendo en la app, el ataque necesita que la víctima **dicte** su
+código. Eso lleva diez años de bancos repitiéndolo, y el aviso va en la misma pantalla
+que el código, que es el momento de máxima atención.
+
+No elimina el ataque. Lo muda a un terreno donde la gente ya está parada.
+
+Se pierde la cookie con el `requestId` que ustedes elogiaron, y no duele: protegía de
+*"que otro apruebe tu pedido"*, que no es el ataque — en el real el navegador que abrió
+el pedido es el del atacante.
 
 ## Lo que ya está de este lado
 
-Construido y probado contra datos de prueba: la pantalla de libreta, cuando no hay
-sesión, ofrece **"Abrir mi libreta en esta pantalla"**, muestra el código, espera, y
-cuando se aprueba la libreta aparece sola.
+La pantalla de libreta, sin sesión, ofrece un campo para el código y abre la libreta al
+tipearlo. Probado contra datos de prueba de punta a punta.
 
-El `requestId` no vuelve al navegador: queda en una cookie `httpOnly`. Aunque alguien
-apruebe un pedido ajeno, solo el navegador que lo abrió puede canjearlo.
+Y de paso apareció un hueco que arreglamos: **en la pantalla de libreta no se podía
+salir.** La franja con el nombre y el "Salir" estaba solo en la portada, así que se
+podía ver la deuda de alguien en el teléfono de la casa sin ninguna forma de cerrarla
+desde la pantalla donde estaba a la vista.
 
-## Una cosa que les puede tocar mirar
+## Sus dos preguntas
 
-El pedido a ClubPay incluye una descripción corta del dispositivo que pide —"una
-computadora con Chrome"— para que la pantalla de confirmación de la app pueda mostrarla.
+**Cinco minutos: de acuerdo**, y el argumento es el correcto. Nosotros teníamos tres y
+no defendemos el número.
 
-**No es prueba de nada, y esa frase estaba mal escrita acá antes.** En este ataque el
-que abre el pedido es el atacante, así que esa cadena la escribe él y puede poner "tu
-iPhone". Sirve en el caso honesto y como color; la defensa está en el nombre del
-comercio —que ClubPay deduce de la clave— y en la pregunta.
-
-Que pase tal cual y sin agregarle nada.
+**Tope de pedidos por persona: sí, y agreguen el otro** — cuántos códigos se pueden
+intentar. Ese límite solo puede vivir en ClubPay: nosotros no guardamos estado, y
+contar mal sería peor que no contar, porque daría la sensación de que está cubierto.

@@ -284,9 +284,8 @@ const products = INITIAL_PRODUCTS.map(mapProduct);
  * Cada comercio es el acreedor de la suya, con su propia fecha de cierre y su propio
  * disponible. No hay ningún objeto que sume las dos (P1, D27, D28, D33).
  */
-/** Emparejamientos en curso. En producción esto vive del lado de ClubPay. */
-let seqPairing = 1;
-const pairings = new Map<string, { code: string; desde: number; token?: string }>();
+/** El código que la app mostraría. Solo fixtures: en producción lo emite ClubPay. */
+const CODIGO_DE_PRUEBA = 'VRCCX';
 
 const accounts: MerchantAccount[] = [
   {
@@ -410,26 +409,11 @@ export const fixtures: NexoPosPort = {
     return CAMPAIGNS.filter((c) => c.storeId === storeId);
   },
 
-  async openPairing(storeId) {
-    const requestId = `req_${(seqPairing++).toString(36)}_${Date.now().toString(36)}`;
-    // Sin vocales: no se arma ninguna palabra sola y no se confunde 0 con O.
-    const alfabeto = '34679BCDFGHJKLMNPQRSTVWXZ';
-    const code = Array.from({ length: 5 }, () =>
-      alfabeto[Math.floor(Math.random() * alfabeto.length)],
-    ).join('');
-    const cuenta = accounts.find((a) => a.storeId === storeId);
-    pairings.set(requestId, { code, desde: Date.now(), token: cuenta?.accountId });
-    return { requestId, code, expiresAt: new Date(Date.now() + 3 * 60_000).toISOString() };
-  },
-
-  async pollPairing(storeId, requestId) {
-    const p = pairings.get(requestId);
-    if (!p) return { status: 'vencido' };
-    if (Date.now() - p.desde > 3 * 60_000) return { status: 'vencido' };
-    // En fixtures no hay nadie del otro lado, así que se aprueba solo a los 6
-    // segundos: alcanza para ver la pantalla esperar y desbloquearse.
-    if (Date.now() - p.desde < 6_000 || !p.token) return { status: 'pendiente' };
-    return { status: 'listo', token: p.token };
+  async redeemPairingCode(storeId, code) {
+    // En fixtures no hay app que genere códigos, así que hay uno fijo y visible.
+    // En producción lo emite ClubPay y no existe nada de esto.
+    if (code.trim().toUpperCase() !== CODIGO_DE_PRUEBA) return null;
+    return accounts.find((a) => a.storeId === storeId)?.accountId ?? null;
   },
 
   async redeemLinkToken(token, storeId) {
