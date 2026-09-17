@@ -443,6 +443,14 @@ export const fixtures: NexoPosPort = {
     return CAMPAIGNS.filter((c) => c.storeId === storeId);
   },
 
+  async redeemLinkToken(token) {
+    // En fixtures el "token" es el propio accountId, para poder probar el circuito
+    // completo sin ClubPay. En producción nada de esto existe.
+    const cuenta = accounts.find((a) => a.accountId === token);
+    if (!cuenta) return null;
+    return { accountId: cuenta.accountId, storeId: cuenta.storeId, displayName: 'Germán Yovan' };
+  },
+
   async listHighlights(storeId) {
     // Súper SOL simula tener estadística; el resto no, que es el caso de toda
     // tienda nueva y el que hay que poder ver sin romper nada.

@@ -3,9 +3,10 @@ import { arbolDe } from '@/lib/arbol';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
-import { getAccountId } from '@/lib/session';
+import { getAccountId, getAccountName } from '@/lib/session';
 import { StoreBrowser } from '@/components/StoreBrowser';
 import { StoreHome } from '@/components/StoreHome';
+import { LibretaBar } from '@/components/LibretaBar';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { StoreHero } from '@/components/StoreHero';
 import { TownSearch } from '@/components/TownSearch';
@@ -131,7 +132,10 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
   const limit = Math.min(Math.max(Number(uno(sp.n)) || DE_A, DE_A), 600);
   const navegando = Boolean(pasilloId || query);
 
-  const accountId = await getAccountId(store.slug);
+  const [accountId, accountName] = await Promise.all([
+    getAccountId(store.slug),
+    getAccountName(store.slug),
+  ]);
   const [pasillos, campaigns, highlights, account] = await Promise.all([
     nexopos.listPasillos(store.id),
     nexopos.listCampaigns(store.id),
@@ -181,6 +185,11 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
 
   return (
     <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={store.bannerUrl} />}>
+      <LibretaBar
+        store={store}
+        accountName={accountName}
+        vencio={uno(sp.libreta) === 'vencio'}
+      />
       <ValueProps store={store} account={account} campaigns={campaigns} pasillos={pasillos} />
       <StoreBrowser
         store={store}

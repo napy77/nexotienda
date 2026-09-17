@@ -24,10 +24,19 @@ export function creditState(
   totalCents: number,
 ): CreditState {
   if (!account) {
+    /*
+      Sin sesión no sabemos si esta persona tiene libreta o no, y no podemos
+      averiguarlo: el que sabe es ClubPay. Así que el mensaje tiene que servir para
+      los dos casos sin afirmar ninguno (P5) — decirle "no tenés libreta" a alguien
+      que sí la tiene es negarle algo que el comerciante le dio.
+
+      Y tiene que decir **cómo se entra**, que es lo que faltaba: la libreta online
+      se abre desde ClubPay y desde ningún otro lado.
+    */
     return {
       ok: false,
       reason: 'sin_cuenta',
-      message: `Para comprar en la libreta, hablá con ${store.name}. Se abre en el mostrador.`,
+      message: `Si ya tenés libreta con ${store.name}, entrá desde ClubPay para usarla acá. Si todavía no, se abre en el mostrador.`,
       offerContact: true,
     };
   }

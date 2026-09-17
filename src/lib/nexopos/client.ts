@@ -35,6 +35,7 @@ import type {
   Campaign,
   CategoryNode,
   Highlights,
+  LinkSession,
   MerchantAccount,
   NewOrder,
   NexoPosPort,
@@ -286,6 +287,23 @@ export const client: NexoPosPort = {
       `/v1/stores/${storeId}/products/${productId}`,
     );
     return w ? mapProduct(w) : null;
+  },
+
+  async redeemLinkToken(token) {
+    try {
+      const r = await cuentas<LinkSession | null>('/v1/cuentas/canjear', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
+      if (!r?.accountId || !r.storeId) return null;
+      return { accountId: r.accountId, storeId: r.storeId, displayName: r.displayName ?? '' };
+    } catch (e) {
+      // Un token vencido es un 4xx y es un caso normal —dos minutos pasan rápido—,
+      // no una falla que haya que gritar. El que llega con uno viejo ve la pantalla
+      // de "volvé a entrar desde ClubPay", no un error del servidor.
+      console.error('[nexotienda] canje de token falló', e);
+      return null;
+    }
   },
 
   async listHighlights(storeId) {

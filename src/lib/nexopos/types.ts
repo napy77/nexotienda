@@ -397,6 +397,21 @@ export interface AccountEntry {
  *
  * El total del pueblo lo calcula ClubPay para mostrárselo al deudor, y nada más (P3).
  */
+/**
+ * Lo que devuelve canjear el token del handoff.
+ *
+ * `storeId` viaja aunque ya sepamos en qué tienda estamos parados, y es a propósito:
+ * es lo que deja **verificar** que el token es de esta tienda. Un token emitido para
+ * la libreta de Jure no puede abrir una sesión en Delfín, y esa comprobación tiene
+ * que poder hacerse sin confiar en el que trajo el token.
+ */
+export interface LinkSession {
+  accountId: string;
+  storeId: string;
+  /** Cómo se llama la persona, para poder mostrar de quién es la libreta abierta. */
+  displayName: string;
+}
+
 export interface MerchantAccount {
   /** Id de la relación persona–comercio. Solo existe si la vinculación fue aceptada. */
   accountId: string;
@@ -637,6 +652,14 @@ export interface NexoPosPort {
    * el estado de toda tienda nueva, y no es un error.
    */
   listHighlights(storeId: string): Promise<Highlights>;
+  /**
+   * Canjea el token de un solo uso del handoff por la sesión de esa libreta.
+   *
+   * Devuelve `null` cuando el token no sirve —vencido, ya usado, inventado— sin
+   * distinguir cuál de las tres: al que está parado en la tienda le da igual, y
+   * decir "ya fue usado" le cuenta algo a quien esté probando tokens ajenos.
+   */
+  redeemLinkToken(token: string): Promise<LinkSession | null>;
 
   /**
    * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.
