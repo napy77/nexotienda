@@ -137,8 +137,35 @@ export interface Highlights {
  * es único dentro de su rama.
  */
 export interface CategoryNode {
+  /**
+   * El id del nodo, prefijado por nivel (`r:Aceites`, `s:Girasol`).
+   *
+   * Prefijado porque un rubro y un subrubro se pueden llamar igual —"Aceites"
+   * adentro de "Aceites"— y hay que poder pedir uno sin traerse el otro. Cuando
+   * NexoPOS manda la forma vieja —una lista plana de nombres— el adapter usa el
+   * nombre como id, que en ese mundo alcanza.
+   */
+  id: string;
   name: string;
+  /** Cuántos productos cuelgan de acá abajo. Lo cuenta NexoPOS sobre lo que hay. */
+  productCount?: number;
   children?: CategoryNode[];
+}
+
+/** Qué pedazo del catálogo se quiere. */
+export interface ProductQuery {
+  pasillo?: string;
+  /** El nodo más profundo elegido. NexoPOS resuelve la rama. */
+  sub?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ProductPage {
+  items: Product[];
+  /** El total **de la consulta**, ya filtrado por stock. No el del catálogo. */
+  total: number;
 }
 
 export interface Pasillo {
@@ -588,7 +615,16 @@ export interface NexoPosPort {
   // --- del comercio ---
   getStore(slug: string): Promise<Store | null>;
   listPasillos(storeId: string): Promise<Pasillo[]>;
-  listProducts(storeId: string): Promise<Product[]>;
+  /**
+   * Un pedazo del catálogo, no el catálogo.
+   *
+   * Delfín tiene siete mil productos: pedirlos todos para mostrar sesenta era
+   * traer siete mil filas y tirar 6.940. El filtro y el corte viven donde están
+   * las filas.
+   */
+  listProducts(storeId: string, query?: ProductQuery): Promise<ProductPage>;
+  /** Un puñado suelto, por id. Para las estanterías, que saben qué quieren. */
+  productsByIds(storeId: string, ids: string[]): Promise<Product[]>;
   getProduct(storeId: string, productId: string): Promise<Product | null>;
   /**
    * Las campañas vigentes, en el orden en que el comerciante las quiere ver.

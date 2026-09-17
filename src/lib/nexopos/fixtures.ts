@@ -24,6 +24,7 @@ import type {
   Store,
   TownSearchResult,
 } from './types';
+import { arbolDe, productosDe } from '@/lib/arbol';
 
 const TOWN = { slug: 'morrison', name: 'Morrison' };
 
@@ -105,25 +106,45 @@ function mapProduct(p: (typeof INITIAL_PRODUCTS)[number]): Product {
 const ARBOLES: Record<string, CategoryNode[]> = {
   despensa: [
     {
+      id: 'r:Aceites y Aderezos',
       name: 'Aceites y Aderezos',
       children: [
-        { name: 'Aceites de oliva' },
-        { name: 'Aceites de girasol' },
-        { name: 'Aceites de maíz' },
-        { name: 'Vinagres' },
-        { name: 'Mayonesa, Ketchup y Mostaza' },
+        { id: 's:Aceites de oliva', name: 'Aceites de oliva' },
+        { id: 's:Aceites de girasol', name: 'Aceites de girasol' },
+        { id: 's:Aceites de maíz', name: 'Aceites de maíz' },
+        { id: 's:Vinagres', name: 'Vinagres' },
+        { id: 's:Mayonesa', name: 'Mayonesa, Ketchup y Mostaza' },
       ],
     },
-    { name: 'Arroz y Legumbres' },
-    { name: 'Fideos y Pastas' },
-    { name: 'Galletitas y Snacks' },
-    { name: 'Café, Té y Yerba' },
+    { id: 'r:Arroz y Legumbres', name: 'Arroz y Legumbres' },
+    { id: 'r:Fideos y Pastas', name: 'Fideos y Pastas' },
+    { id: 'r:Galletitas y Snacks', name: 'Galletitas y Snacks' },
+    { id: 'r:Café, Té y Yerba', name: 'Café, Té y Yerba' },
   ],
 };
 
-function conArbol(p: Pasillo): Pasillo {
-  const children = ARBOLES[p.id];
-  return children ? { ...p, children } : p;
+/**
+ * Se poda contra los productos del comercio, igual que hace NexoPOS: un nodo sin
+ * nada no llega. Acá se emula para que el modo fixture no muestre una góndola que
+ * contra la API real no existiría.
+ */
+function podar(nodos: CategoryNode[], conProductos: Set<string>): CategoryNode[] {
+  return nodos
+    .map((n) => ({ ...n, children: podar(n.children ?? [], conProductos) }))
+    .filter((n) => conProductos.has(n.name) || (n.children?.length ?? 0) > 0)
+    .map((n) => (n.children?.length ? n : { id: n.id, name: n.name }));
+}
+
+function conArbol(p: Pasillo, delComercio: Product[]): Pasillo {
+  const conProductos = new Set(
+    delComercio
+      .filter((x) => x.pasilloId === p.id)
+      .map((x) => x.subCategory)
+      .filter((x): x is string => Boolean(x)),
+  );
+  const crudo = ARBOLES[p.id];
+  if (!crudo) return p;
+  return { ...p, children: podar(crudo, conProductos) };
 }
 
 /**
@@ -376,12 +397,41 @@ export const fixtures: NexoPosPort = {
   },
 
   async listPasillos(storeId) {
-    const ids = new Set(visibles(storeId).map((p) => p.pasilloId));
-    return (PASILLOS as Pasillo[]).filter((p) => ids.has(p.id)).map(conArbol);
+    const delComercio = visibles(storeId);
+    const ids = new Set(delComercio.map((p) => p.pasilloId));
+    return (PASILLOS as Pasillo[])
+      .filter((p) => ids.has(p.id))
+      .map((p) => conArbol(p, delComercio));
   },
 
-  async listProducts(storeId) {
-    return visibles(storeId);
+  async listProducts(storeId, query = {}) {
+    let items = visibles(storeId);
+
+    if (query.pasillo) {
+      items = items.filter((p) => p.pasilloId === query.pasillo);
+      if (query.sub) {
+        const pasillo = (PASILLOS as Pasillo[]).find((p) => p.id === query.pasillo);
+        items = productosDe(items, arbolDe(conArbol(pasillo!, visibles(storeId))), query.sub);
+      }
+    }
+
+    if (query.q) {
+      const q = query.q.toLowerCase();
+      items = items.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.brand ?? '').toLowerCase().includes(q) ||
+          (p.subCategory ?? '').toLowerCase().includes(q),
+      );
+    }
+
+    const offset = query.offset ?? 0;
+    return { items: items.slice(offset, offset + Math.min(query.limit ?? 60, 200)), total: items.length };
+  },
+
+  async productsByIds(storeId, ids) {
+    const porId = new Map(visibles(storeId).map((p) => [p.id, p]));
+    return ids.map((id) => porId.get(id)).filter((p): p is Product => p !== undefined);
   },
 
   async listCampaigns(storeId) {

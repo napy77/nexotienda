@@ -1,39 +1,46 @@
 import type { CategoryNode, Pasillo, Product } from '@/lib/nexopos/types';
 
 /**
- * El árbol de una góndola: cómo se recorre y qué cae en cada rama.
+ * El árbol de una góndola: cómo se recorre.
  *
- * Hay dos formas de datos que tienen que convivir. La vieja —`subCategories`, una
- * lista plana— y la que pedimos, un árbol con la profundidad que tenga. Todo lo de
- * acá abajo trabaja sobre el árbol, y la lista plana se convierte en un árbol de un
- * nivel al entrar. Así hay un solo camino de código en vez de dos.
+ * Conviven dos formas de datos y tienen que seguir conviviendo: la vieja
+ * —`subCategories`, una lista plana de nombres— y la que pedimos, un árbol con ids
+ * y con la profundidad que tenga. Todo lo de acá abajo trabaja sobre el árbol, y la
+ * lista plana se convierte en uno de un solo nivel al entrar. Un camino de código,
+ * no dos.
+ *
+ * **Lo que ya no se hace acá es podar.** Antes teníamos el catálogo entero en
+ * memoria y descartábamos las ramas sin productos nosotros; ahora NexoPOS cuenta el
+ * árbol desde los productos que el comercio tiene, así que una rama que llega es una
+ * rama que tiene algo. Deducirlo de nuevo sobre las sesenta fichas que bajamos daría
+ * peor: escondería ramas por no haberlas mirado.
  */
 export function arbolDe(pasillo: Pasillo | undefined): CategoryNode[] {
   if (!pasillo) return [];
   if (pasillo.children?.length) return pasillo.children;
-  return (pasillo.subCategories ?? []).map((name) => ({ name }));
+  return (pasillo.subCategories ?? []).map((name) => ({ id: name, name }));
 }
 
-/** Los nodos que cuelgan del camino elegido: `[]` es la raíz de la góndola. */
+/** Los nodos que cuelgan del camino elegido. `[]` es la raíz de la góndola. */
 export function hijosEn(raiz: CategoryNode[], ruta: string[]): CategoryNode[] {
-  let nivel = raiz;
-  for (const nombre of ruta) {
-    const nodo = nivel.find((n) => n.name === nombre);
-    if (!nodo) return [];
-    nivel = nodo.children ?? [];
-  }
-  return nivel;
+  return nivelYNodo(raiz, ruta).nivel;
 }
 
-function buscar(nivel: CategoryNode[], ruta: string[]): CategoryNode | undefined {
+/** El nodo en el que uno está parado, para poder nombrarlo. */
+export function nodoEn(raiz: CategoryNode[], ruta: string[]): CategoryNode | undefined {
+  return nivelYNodo(raiz, ruta).nodo;
+}
+
+function nivelYNodo(raiz: CategoryNode[], ruta: string[]) {
+  let nivel = raiz;
   let nodo: CategoryNode | undefined;
-  let actual = nivel;
-  for (const nombre of ruta) {
-    nodo = actual.find((n) => n.name === nombre);
-    if (!nodo) return undefined;
-    actual = nodo.children ?? [];
+  for (const id of ruta) {
+    const hallado = nivel.find((n) => n.id === id);
+    if (!hallado) return { nivel: [] as CategoryNode[], nodo: undefined };
+    nodo = hallado;
+    nivel = hallado.children ?? [];
   }
-  return nodo;
+  return { nivel, nodo };
 }
 
 /** Todos los nombres de una rama, ella incluida. */
@@ -42,36 +49,38 @@ function nombresDe(nodo: CategoryNode): string[] {
 }
 
 /**
- * Los productos de una rama.
+ * Un nodo por id, esté a la profundidad que esté.
  *
- * Se aceptan **la rama y todo lo que cuelga**: el producto puede estar clasificado
- * en el rubro ("Aceites y aderezos") o en la hoja ("Aceites de oliva"), según cuán
- * prolijo esté el catálogo de ese comercio. Pedir la hoja exacta escondería la mitad
- * de la góndola de los que cargaron grueso.
+ * Es la semántica del parámetro `sub` de la API: viaja **solo el nodo más profundo
+ * elegido**, no el camino. Mandar el camino entero obligaría a que los dos lados
+ * coincidan en cómo se llega, cuando lo único que hace falta es saber a dónde.
+ */
+export function nodoPorId(nodos: CategoryNode[], id: string): CategoryNode | undefined {
+  for (const n of nodos) {
+    if (n.id === id) return n;
+    const hallado = nodoPorId(n.children ?? [], id);
+    if (hallado) return hallado;
+  }
+  return undefined;
+}
+
+/**
+ * Los productos de una rama. **Solo lo usan los fixtures**: contra la API de verdad
+ * esto lo resuelve NexoPOS, que es donde están las filas.
+ *
+ * Se aceptan la rama y todo lo que cuelga: el producto puede estar clasificado en el
+ * rubro ("Aceites y aderezos") o en la hoja ("Aceites de oliva"), según cuán prolijo
+ * esté el catálogo de ese comercio. Pedir la hoja exacta escondería la mitad de la
+ * góndola de los que cargaron grueso.
  */
 export function productosDe(
   productos: Product[],
   raiz: CategoryNode[],
-  ruta: string[],
+  subId: string | undefined,
 ): Product[] {
-  if (ruta.length === 0) return productos;
-  const nodo = buscar(raiz, ruta);
+  if (!subId) return productos;
+  const nodo = nodoPorId(raiz, subId);
   if (!nodo) return [];
   const nombres = new Set(nombresDe(nodo));
   return productos.filter((p) => p.subCategory && nombres.has(p.subCategory));
-}
-
-/**
- * Poda: solo las ramas que tienen algo.
- *
- * Un rubro vacío ofrecido en pantalla promete una góndola y entrega un cartel de
- * "no hay nada" — y el que lo tocó no piensa "qué raro, está vacío", piensa que la
- * tienda anda mal. El catálogo maestro trae el árbol entero del rubro; el comercio
- * tiene una fracción.
- */
-export function podar(nodos: CategoryNode[], conProductos: Set<string>): CategoryNode[] {
-  return nodos
-    .map((n) => ({ ...n, children: podar(n.children ?? [], conProductos) }))
-    .filter((n) => conProductos.has(n.name) || (n.children?.length ?? 0) > 0)
-    .map((n) => (n.children?.length ? n : { name: n.name }));
 }

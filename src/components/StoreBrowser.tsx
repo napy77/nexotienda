@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 import type { CategoryNode, Pasillo, Product, Store } from '@/lib/nexopos/types';
-import { hijosEn } from '@/lib/arbol';
+import { hijosEn, nodoEn } from '@/lib/arbol';
 import { ProductCard } from './ProductCard';
 
 /**
@@ -88,7 +88,7 @@ export function StoreBrowser({
   store: Store;
   pasillos: Pasillo[];
   pasilloId?: string;
-  /** El camino elegido dentro de la góndola: `['Aceites y Aderezos', 'De oliva']`. */
+  /** El camino elegido, por id de nodo: `['r:Aceites', 's:Girasol']`. */
   ruta: string[];
   /** El árbol de la góndola, ya podado a lo que tiene productos. */
   arbol: CategoryNode[];
@@ -193,18 +193,15 @@ export function StoreBrowser({
             items={[
               {
                 key: '__todo',
-                label:
-                  prefijo.length === 0
-                    ? `Todo ${pasilloActual!.name}`
-                    : `Todo ${prefijo[prefijo.length - 1]}`,
+                label: `Todo ${nodoEn(arbol, prefijo)?.name ?? pasilloActual!.name}`,
                 href: url(prefijo),
                 active: ruta.length === prefijo.length,
               },
               ...hijos.map((h: CategoryNode) => ({
-                key: h.name,
+                key: h.id,
                 label: h.name,
-                href: url([...prefijo, h.name]),
-                active: ruta[prefijo.length] === h.name,
+                href: url([...prefijo, h.id]),
+                active: ruta[prefijo.length] === h.id,
               })),
             ]}
           />
@@ -234,7 +231,7 @@ export function StoreBrowser({
               <>
                 {total} {total === 1 ? 'producto' : 'productos'} en{' '}
                 <span className="font-semibold text-neutral-800">
-                  {ruta[ruta.length - 1] ?? pasilloActual?.name}
+                  {nodoEn(arbol, ruta)?.name ?? pasilloActual?.name}
                 </span>
               </>
             )}

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import type { CategoryNode, Pasillo, Product } from '@/lib/nexopos/types';
-import { arbolDe, podar, productosDe } from '@/lib/arbol';
+import { arbolDe } from '@/lib/arbol';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
@@ -133,66 +132,52 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
   const navegando = Boolean(pasilloId || query);
 
   const accountId = await getAccountId(store.slug);
-  const [pasillos, todos, campaigns, highlights, account] = await Promise.all([
+  const [pasillos, campaigns, highlights, account] = await Promise.all([
     nexopos.listPasillos(store.id),
-    nexopos.listProducts(store.id),
     nexopos.listCampaigns(store.id),
     nexopos.listHighlights(store.id),
     accountId ? nexopos.getAccount(store.id, accountId) : Promise.resolve(null),
   ]);
 
-  // Lo que se está mirando. El filtrado pasa acá, en el servidor, y al navegador
-  // baja el pedazo — no las siete mil fichas para que elija cuál pintar.
-  const q = query.toLowerCase();
-  const delPasillo = pasilloId ? todos.filter((p) => p.pasilloId === pasilloId) : [];
+  const arbol = arbolDe(pasillos.find((p) => p.id === pasilloId));
 
   /*
-    El árbol de la góndola, podado a lo que tiene mercadería, y con lo que los
-    productos declaran y el árbol no menciona colgado al final.
+    Se pide lo que se va a mostrar y nada más.
 
-    El árbol es una declaración y los productos son el hecho. Ofrecer una rama vacía
-    promete una góndola y entrega un cartel; esconder un subrubro que tiene productos
-    porque nadie lo declaró es perder media góndola. Se cruzan los dos.
+    Antes se traía el catálogo completo y se filtraba acá: para una góndola de
+    sesenta productos eso eran siete mil filas de Delfín, de las que se descartaban
+    6.940. El filtro vive ahora donde están las filas, y del árbol solo viaja el nodo
+    más profundo elegido — NexoPOS resuelve la rama entera.
   */
-  const conProductos = new Set(
-    delPasillo.map((p) => p.subCategory).filter((x): x is string => Boolean(x)),
-  );
-  const declarado = podar(arbolDe(pasillos.find((p) => p.id === pasilloId)), conProductos);
-  const nombrados = new Set<string>();
-  const anotar = (ns: CategoryNode[]) =>
-    ns.forEach((n) => {
-      nombrados.add(n.name);
-      anotar(n.children ?? []);
-    });
-  anotar(declarado);
-  const arbol = [
-    ...declarado,
-    ...[...conProductos]
-      .filter((sc) => !nombrados.has(sc))
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ name })),
-  ];
+  const pagina = navegando
+    ? await nexopos.listProducts(store.id, {
+        pasillo: pasilloId,
+        sub: ruta[ruta.length - 1],
+        q: query || undefined,
+        limit,
+      })
+    : { items: [], total: 0 };
 
-  const encontrados = query
-    ? todos.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          (p.brand ?? '').toLowerCase().includes(q) ||
-          (p.subCategory ?? '').toLowerCase().includes(q),
-      )
-    : productosDe(delPasillo, arbol, ruta);
-
-  // Para la portada alcanza con lo que las estanterías nombran.
-  const deEstanterias = navegando
+  // Para la portada alcanza con lo que las estanterías nombran. Los ids se juntan
+  // en una sola consulta en vez de una por estantería.
+  const idsDeEstanterias = navegando
     ? []
-    : (() => {
-        const ids = new Set([
+    : [
+        ...new Set([
           ...campaigns.flatMap((c) => c.productIds),
           ...highlights.bestSellers,
           ...highlights.mostSearched,
-        ]);
-        return todos.filter((p) => ids.has(p.id));
-      })();
+        ]),
+      ];
+  const [deEstanterias, muestra] = navegando
+    ? [[], []]
+    : await Promise.all([
+        nexopos.productsByIds(store.id, idsDeEstanterias),
+        // El relleno de la tienda sin campañas ni estadística. Doce, no siete mil.
+        idsDeEstanterias.length === 0
+          ? nexopos.listProducts(store.id, { limit: 12 }).then((r) => r.items)
+          : Promise.resolve([]),
+      ]);
 
   return (
     <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={store.bannerUrl} />}>
@@ -204,8 +189,8 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
         ruta={ruta}
         arbol={arbol}
         query={query}
-        products={navegando ? encontrados.slice(0, limit) : []}
-        total={encontrados.length}
+        products={pagina.items}
+        total={pagina.total}
         limit={limit}
       >
         <StoreHome
@@ -213,28 +198,9 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
           campaigns={campaigns}
           highlights={highlights}
           products={deEstanterias}
-          fallback={muestra(todos, pasillos)}
+          fallback={muestra}
         />
       </StoreBrowser>
     </StoreShell>
   );
-}
-
-/**
- * Qué mostrar en una tienda que todavía no tiene ni campañas ni estadística — que es
- * toda tienda el día que abre.
- *
- * Una muestra repartida entre góndolas, para que la portada se parezca a una tienda y
- * no a un volcado del catálogo. **No dice qué es**, y ese es el punto: no tenemos con
- * qué llamarla "lo más vendido", así que no la llamamos así.
- */
-function muestra(todos: Product[], pasillos: Pasillo[]): Product[] {
-  const porPasillo = new Map<string, Product[]>();
-  for (const p of todos) {
-    const lista = porPasillo.get(p.pasilloId) ?? [];
-    if (lista.length < 3) lista.push(p);
-    porPasillo.set(p.pasilloId, lista);
-  }
-  // En el orden de las góndolas del comercio, no en el de la base de datos.
-  return pasillos.flatMap((pa) => porPasillo.get(pa.id) ?? []).slice(0, 12);
 }

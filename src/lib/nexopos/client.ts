@@ -33,6 +33,7 @@
 import type {
   AccountEntry,
   Campaign,
+  CategoryNode,
   Highlights,
   MerchantAccount,
   NewOrder,
@@ -42,6 +43,8 @@ import type {
   Pasillo,
   PaymentMethod,
   Product,
+  ProductPage,
+  ProductQuery,
   Store,
   TownSearchResult,
 } from './types';
@@ -188,6 +191,16 @@ function mapStore(w: StoreWire): Store {
  */
 type ProductWire = Omit<Product, 'images'> & { images?: unknown };
 
+/**
+ * El árbol viene con ids desde que NexoPOS lo manda, pero un nodo sin id no puede
+ * romper la góndola: se cae al nombre, que es lo que se usaba antes de que
+ * existieran los ids.
+ */
+function conIds(nodos: CategoryNode[] | undefined): CategoryNode[] | undefined {
+  if (!Array.isArray(nodos)) return undefined;
+  return nodos.map((n) => ({ ...n, id: n.id ?? n.name, children: conIds(n.children) }));
+}
+
 function mapProduct(w: ProductWire): Product {
   const galeria = Array.isArray(w.images)
     ? w.images.filter((u): u is string => typeof u === 'string' && u.length > 0)
@@ -232,10 +245,41 @@ export const client: NexoPosPort = {
   searchTown: (townSlug, query) =>
     catalogo<TownSearchResult>(`/v1/towns/${townSlug}/search?q=${encodeURIComponent(query)}`),
 
-  listPasillos: (storeId) => catalogo<Pasillo[]>(`/v1/stores/${storeId}/pasillos`),
-  async listProducts(storeId) {
-    const ws = await catalogo<ProductWire[]>(`/v1/stores/${storeId}/products`);
-    return (ws ?? []).map(mapProduct);
+  async listPasillos(storeId) {
+    const ps = await catalogo<Pasillo[]>(`/v1/stores/${storeId}/pasillos`);
+    return (ps ?? []).map((p) => ({ ...p, children: conIds(p.children) }));
+  },
+  async listProducts(storeId, query = {}) {
+    const qs = new URLSearchParams();
+    if (query.pasillo) qs.set('pasillo', query.pasillo);
+    if (query.sub) qs.set('sub', query.sub);
+    if (query.q) qs.set('q', query.q);
+    qs.set('limit', String(Math.min(query.limit ?? 60, 200)));
+    if (query.offset) qs.set('offset', String(query.offset));
+
+    const r = await catalogo<ProductPage | ProductWire[]>(
+      `/v1/stores/${storeId}/products?${qs.toString()}`,
+    );
+    // La forma vieja —el arreglo pelado— sigue viajando de su lado hasta que
+    // confirmemos la migración, y un rollback la devolvería. Se aceptan las dos.
+    if (Array.isArray(r)) {
+      const items = r.map(mapProduct);
+      return { items, total: items.length };
+    }
+    const items = (r?.items ?? []).map((w) => mapProduct(w as ProductWire));
+    return { items, total: typeof r?.total === 'number' ? r.total : items.length };
+  },
+
+  async productsByIds(storeId, ids) {
+    if (ids.length === 0) return [];
+    const r = await catalogo<ProductPage | ProductWire[]>(
+      `/v1/stores/${storeId}/products?ids=${ids.map(encodeURIComponent).join(',')}`,
+    );
+    const items = Array.isArray(r) ? r : (r?.items ?? []);
+    const porId = new Map(items.map((w) => [w.id, mapProduct(w as ProductWire)]));
+    // En el orden en que se pidieron, que es el que significa algo: la campaña lo
+    // eligió, o es lo último que esta persona compró.
+    return ids.map((id) => porId.get(id)).filter((p): p is Product => p !== undefined);
   },
   async getProduct(storeId, productId) {
     const w = await catalogo<ProductWire | null>(

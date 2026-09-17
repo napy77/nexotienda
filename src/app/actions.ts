@@ -171,12 +171,9 @@ export async function orderPulseAction(code: string): Promise<string | null> {
  */
 export async function productsByIdAction(storeId: string, ids: string[]) {
   if (!Array.isArray(ids) || ids.length === 0) return [];
-  const pedidos = new Set(ids.slice(0, 24));
   try {
-    const todos = await nexopos.listProducts(storeId);
-    const porId = new Map(todos.map((p) => [p.id, p]));
-    // En el orden en que los pidieron: lo último comprado va primero.
-    return [...pedidos].map((id) => porId.get(id)).filter((p) => p !== undefined);
+    // El orden lo respeta el port: lo último comprado va primero.
+    return await nexopos.productsByIds(storeId, ids.slice(0, 24));
   } catch (e) {
     console.error('[nexotienda] productsById falló', e);
     return [];

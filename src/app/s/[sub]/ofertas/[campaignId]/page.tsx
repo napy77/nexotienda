@@ -18,11 +18,7 @@ export default async function OfertasPage({ params }: Props) {
   const store = await nexopos.getStore(sub);
   if (!store) notFound();
 
-  const [campaigns, products] = await Promise.all([
-    nexopos.listCampaigns(store.id),
-    nexopos.listProducts(store.id),
-  ]);
-
+  const campaigns = await nexopos.listCampaigns(store.id);
   const campaign = campaigns.find((c) => c.id === campaignId);
   // Una campaña que se venció mientras el link daba vueltas por WhatsApp no es un
   // error del que entró: es que se terminó.
@@ -45,10 +41,8 @@ export default async function OfertasPage({ params }: Props) {
     );
   }
 
-  const porId = new Map(products.map((p) => [p.id, p]));
-  const enOferta = campaign.productIds
-    .map((id) => porId.get(id))
-    .filter((p): p is NonNullable<typeof p> => p !== undefined);
+  // Solo los de la campaña, no el catálogo entero para quedarse con veinte.
+  const enOferta = await nexopos.productsByIds(store.id, campaign.productIds);
 
   return (
     <StoreShell store={store}>
