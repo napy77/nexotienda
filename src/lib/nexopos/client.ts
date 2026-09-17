@@ -218,6 +218,51 @@ function mapProduct(w: ProductWire): Product {
   return { ...w, images, imageUrl: w.imageUrl ?? images[0] };
 }
 
+/**
+ * La cuenta como la manda NexoPOS.
+ *
+ * Los nombres no son los del dominio —`paused` contra `creditPaused`,
+ * `onlineEnabled` contra `onlineCreditEnabled`— y acá es donde se traducen, que es
+ * para lo que existe un adapter. Se aceptan los dos por si queda alguna versión
+ * anterior dando vueltas.
+ */
+interface AccountWire {
+  accountId: string;
+  storeId: string;
+  displayName?: string;
+  storeName?: string;
+  storeSlug?: string;
+  balanceCents?: number;
+  limitCents?: number | null;
+  availableCents?: number | null;
+  paused?: boolean;
+  creditPaused?: boolean;
+  onlineEnabled?: boolean;
+  onlineCreditEnabled?: boolean;
+  closingDay?: number;
+  linkedAt?: string;
+  statements?: MerchantAccount['statements'];
+}
+
+function mapAccount(w: AccountWire): MerchantAccount {
+  return {
+    accountId: w.accountId,
+    storeId: w.storeId,
+    displayName: w.displayName,
+    storeName: w.storeName ?? '',
+    storeSlug: w.storeSlug ?? '',
+    // `null` es sin límite, que es el default y el caso más común: así funciona el
+    // cuaderno. Mostrar 0 sería exactamente al revés de la verdad, y `?? null`
+    // —en vez de `?? 0`— es lo que lo garantiza cuando el campo no viene.
+    availableCents: w.availableCents ?? null,
+    closingDay: w.closingDay,
+    creditPaused: w.creditPaused ?? w.paused ?? false,
+    onlineCreditEnabled: w.onlineCreditEnabled ?? w.onlineEnabled ?? false,
+    linkedAt: w.linkedAt,
+    statements: w.statements ?? [],
+  };
+}
+
 // ---------------------------------------------------------------------------
 
 export const client: NexoPosPort = {
@@ -289,14 +334,31 @@ export const client: NexoPosPort = {
     return w ? mapProduct(w) : null;
   },
 
-  async redeemLinkToken(token) {
+  async redeemLinkToken(token, storeId) {
     try {
+      /*
+        El `storeId` va en el **pedido** y no solo en la respuesta.
+
+        El token no dice de qué comercio es —por eso mismo ClubPay puede validarlo
+        contra la clave del comercio— así que NexoPOS necesita saber a quién
+        preguntarle. Nosotros siempre lo sabemos: el canje ocurre en
+        `jure.nexotienda.app` y no hay ambigüedad posible.
+
+        Y ahí se resuelve la verificación cruzada: si el token es de Jure y lo
+        canjeamos diciendo "tienda de Delfín", ClubPay lo valida contra la clave de
+        Delfín y no coincide.
+      */
       const r = await cuentas<LinkSession | null>('/v1/cuentas/canjear', {
         method: 'POST',
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, storeId }),
       });
       if (!r?.accountId || !r.storeId) return null;
-      return { accountId: r.accountId, storeId: r.storeId, displayName: r.displayName ?? '' };
+      return {
+        accountId: r.accountId,
+        storeId: r.storeId,
+        displayName: r.displayName ?? '',
+        linkedAt: r.linkedAt,
+      };
     } catch (e) {
       // Un token vencido es un 4xx y es un caso normal —dos minutos pasan rápido—,
       // no una falla que haya que gritar. El que llega con uno viejo ve la pantalla
@@ -354,8 +416,12 @@ export const client: NexoPosPort = {
     }),
 
   // --- cuentas: además de la clave, piden la sesión del token de ClubPay ---
-  getAccount: (storeId, accountId) =>
-    cuentas<MerchantAccount | null>(`/v1/stores/${storeId}/accounts/${accountId}`),
+  async getAccount(storeId, accountId) {
+    const w = await cuentas<AccountWire | null>(
+      `/v1/cuentas/${encodeURIComponent(accountId)}?storeId=${encodeURIComponent(storeId)}`,
+    );
+    return w?.accountId ? mapAccount(w) : null;
+  },
 
   getStatementEntries: (storeId, accountId, statementId) =>
     cuentas<AccountEntry[]>(

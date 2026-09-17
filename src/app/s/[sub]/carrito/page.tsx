@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { nexopos } from '@/lib/nexopos';
-import { getAccountId } from '@/lib/session';
+import { libretaDeLaSesion } from '@/lib/libreta';
 import { Checkout } from '@/components/Checkout';
 import { StoreShell } from '@/components/StoreShell';
 
@@ -10,8 +10,7 @@ export default async function CarritoPage({ params }: { params: Promise<{ sub: s
   if (!store) notFound();
 
   // Lo normal es no tener cuenta: se compra y se paga, sin identificarse.
-  const accountId = await getAccountId(store.slug);
-  const account = accountId ? await nexopos.getAccount(store.id, accountId) : null;
+  const { account } = await libretaDeLaSesion(store);
 
   return (
     <StoreShell store={store}>

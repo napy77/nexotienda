@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { accountCookieName } from '@/lib/session';
+import { sessionCookieName, sessionCookieOptions, sessionCookieValue } from '@/lib/session';
 
 /**
  * Simulador del vínculo con ClubPay. **Solo desarrollo.**
@@ -27,9 +27,13 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ sub: st
   const res = NextResponse.redirect(back);
 
   if (request.nextUrl.searchParams.has('salir')) {
-    res.cookies.delete(accountCookieName(sub));
+    res.cookies.delete(sessionCookieName(sub));
   } else if (acc) {
-    res.cookies.set(accountCookieName(sub), acc, { httpOnly: true, sameSite: 'lax', path: '/' });
+    res.cookies.set(
+      sessionCookieName(sub),
+      sessionCookieValue({ accountId: acc, displayName: 'Germán Yovan' }),
+      sessionCookieOptions,
+    );
   }
   return res;
 }

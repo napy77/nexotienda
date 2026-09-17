@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { sessionCookies } from '@/lib/session';
+import { sessionCookieName } from '@/lib/session';
 
 /**
  * Cerrar la libreta en este comercio.
@@ -16,7 +16,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ sub: s
   const { sub } = await ctx.params;
   const host = request.headers.get('host') ?? request.nextUrl.host;
   const res = NextResponse.redirect(new URL(`${request.nextUrl.protocol}//${host}/`), 303);
-  res.cookies.delete(sessionCookies.acc(sub));
-  res.cookies.delete(sessionCookies.who(sub));
+  res.cookies.delete(sessionCookieName(sub));
   return res;
 }

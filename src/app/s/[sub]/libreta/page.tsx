@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { BookMarked } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
-import { getAccountId } from '@/lib/session';
+import { libretaDeLaSesion } from '@/lib/libreta';
 import { money, longDate, shortDate } from '@/lib/format';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { PayAccount } from '@/components/PayAccount';
@@ -17,9 +17,7 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
   const { sub } = await params;
   const store = await nexopos.getStore(sub);
   if (!store) notFound();
-
-  const accountId = await getAccountId(store.slug);
-  const account = accountId ? await nexopos.getAccount(store.id, accountId) : null;
+  const { account } = await libretaDeLaSesion(store);
 
   if (!account) {
     return (
@@ -66,7 +64,9 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
       <h1 className="mb-1 text-2xl font-black tracking-tight text-neutral-900">
         Tu libreta con {store.name}
       </h1>
-      <p className="mb-6 text-sm text-neutral-600">Cierra el {account.closingDay} de cada mes.</p>
+      {account.closingDay !== undefined && (
+        <p className="mb-6 text-sm text-neutral-600">Cierra el {account.closingDay} de cada mes.</p>
+      )}
 
       {/*
         Sin límite es el default y el caso más común: ahí no se muestra ninguna línea
@@ -205,7 +205,9 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
               <div>
                 <p className="text-sm font-bold text-neutral-900">{open.label}</p>
                 <p className="text-xs text-neutral-500">
-                  Todavía abierto. Cierra el {account.closingDay}.
+                  {account.closingDay !== undefined
+                    ? `Todavía abierto. Cierra el ${account.closingDay}.`
+                    : 'Todavía abierto.'}
                 </p>
               </div>
               <p className="text-lg font-black text-neutral-900">{money(open.totalCents)}</p>

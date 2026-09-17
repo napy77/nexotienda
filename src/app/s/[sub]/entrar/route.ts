@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { nexopos } from '@/lib/nexopos';
-import { sessionCookieOptions, sessionCookies } from '@/lib/session';
+import { sessionCookieName, sessionCookieOptions, sessionCookieValue } from '@/lib/session';
 
 /**
  * El canje del handoff: `jure.nexotienda.app/entrar?t=…`
@@ -18,9 +18,11 @@ import { sessionCookieOptions, sessionCookies } from '@/lib/session';
  * - **`Referrer-Policy: no-referrer`.** La tienda carga fotos de productos de
  *   servidores ajenos, y el navegador les manda de qué URL venía. Sin esta línea, el
  *   token se le cuenta a un CDN de imágenes.
- * - **Se verifica que el token sea de ESTA tienda.** Uno emitido para la libreta de
- *   Jure no puede abrir sesión en Delfín. Lo comprobamos nosotros en vez de confiar
- *   en quien trajo el token.
+ * - **El token no puede abrir la tienda equivocada.** La comprobación de verdad la
+ *   hace NexoPOS: le mandamos el `storeId` junto con el token, y ellos lo validan
+ *   contra la clave de *ese* comercio en ClubPay — un token de Jure canjeado como
+ *   Delfín no valida. La comparación que queda acá abajo ya no es esa comprobación:
+ *   es el cinturón que atrapa una respuesta incoherente de NexoPOS, no un ataque.
  * - **Nunca se redirige a una URL que venga de afuera.** Siempre a la raíz de este
  *   mismo host, que además es lo que conserva el carrito: otro host es otro origen y
  *   otro `localStorage`.
@@ -40,7 +42,9 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ sub: st
   const store = await nexopos.getStore(sub);
   if (!token || !store) return irA(raiz);
 
-  const sesion = await nexopos.redeemLinkToken(token);
+  // El `storeId` va en el pedido: el token no dice de qué comercio es, y nosotros
+  // siempre lo sabemos porque el canje ocurre en el subdominio de ese comercio.
+  const sesion = await nexopos.redeemLinkToken(token, store.id);
 
   // Un token que no sirve —vencido, ya usado, de otra tienda— termina igual: de
   // vuelta en la tienda, con el aviso. No se distingue cuál de los tres fue: al que
@@ -52,7 +56,15 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ sub: st
   }
 
   const res = irA(raiz);
-  res.cookies.set(sessionCookies.acc(sub), sesion.accountId, sessionCookieOptions);
-  res.cookies.set(sessionCookies.who(sub), sesion.displayName, sessionCookieOptions);
+  res.cookies.set(
+    sessionCookieName(sub),
+    sessionCookieValue({
+      accountId: sesion.accountId,
+      displayName: sesion.displayName,
+      // Se guarda para poder detectar después que el vínculo cambió.
+      linkedAt: sesion.linkedAt,
+    }),
+    sessionCookieOptions,
+  );
   return res;
 }

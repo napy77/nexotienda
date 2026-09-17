@@ -291,6 +291,8 @@ const accounts: MerchantAccount[] = [
     // forma de saber desde acá que son el mismo ser humano — eso solo lo sabe ClubPay.
     accountId: 'acc_sol_4b91',
     storeId: 'store-supersol',
+    displayName: 'Germán Yovan',
+    linkedAt: '2026-09-17T10:00:00.000Z',
     storeName: 'Súper SOL',
     storeSlug: 'supersol',
     availableCents: money(18500),
@@ -443,12 +445,18 @@ export const fixtures: NexoPosPort = {
     return CAMPAIGNS.filter((c) => c.storeId === storeId);
   },
 
-  async redeemLinkToken(token) {
+  async redeemLinkToken(token, storeId) {
     // En fixtures el "token" es el propio accountId, para poder probar el circuito
     // completo sin ClubPay. En producción nada de esto existe.
     const cuenta = accounts.find((a) => a.accountId === token);
-    if (!cuenta) return null;
-    return { accountId: cuenta.accountId, storeId: cuenta.storeId, displayName: 'Germán Yovan' };
+    // Igual que NexoPOS: si el token no es de la tienda que lo canjea, no se canjea.
+    if (!cuenta || cuenta.storeId !== storeId) return null;
+    return {
+      accountId: cuenta.accountId,
+      storeId: cuenta.storeId,
+      displayName: cuenta.displayName ?? 'Germán Yovan',
+      linkedAt: cuenta.linkedAt,
+    };
   },
 
   async listHighlights(storeId) {

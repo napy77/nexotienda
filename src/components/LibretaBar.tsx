@@ -17,12 +17,32 @@ export function LibretaBar({
   store,
   accountName,
   vencio,
+  caduca,
 }: {
   store: Store;
   accountName: string | null;
   /** Volvió de ClubPay con un token que ya no servía. */
   vencio?: boolean;
+  /**
+   * La sesión existía pero el vínculo cambió: el comerciante desvinculó al cliente,
+   * o lo volvió a vincular a otra ficha. No se dice cuál de las dos —no lo sabemos y
+   * tampoco nos corresponde contarlo— se dice qué hacer.
+   */
+  caduca?: boolean;
 }) {
+  if (caduca) {
+    return (
+      <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+        <TriangleAlert className="h-4 w-4 shrink-0 text-amber-700" />
+        <p className="text-sm text-amber-900">
+          <span className="font-bold">Tu libreta se cerró acá.</span> Volvé a entrar
+          desde ClubPay, en Mis comercios → {store.name}. Si no te deja, hablá con el
+          comercio.
+        </p>
+      </div>
+    );
+  }
+
   if (vencio) {
     return (
       <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">

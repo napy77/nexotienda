@@ -406,16 +406,33 @@ export interface AccountEntry {
  * que poder hacerse sin confiar en el que trajo el token.
  */
 export interface LinkSession {
+  /**
+   * El id de la libreta **en NexoPOS** (`CLI-4231`), no el de ClubPay, aunque el
+   * canje pase por ahí. Es el mismo que ya acepta `POST /v1/orders`: si fuera el
+   * otro, la sesión abriría bien y el primer pedido a la libreta fallaría, que es
+   * el peor lugar para enterarse.
+   */
   accountId: string;
   storeId: string;
   /** Cómo se llama la persona, para poder mostrar de quién es la libreta abierta. */
   displayName: string;
+  /**
+   * Cuándo se estableció este vínculo. Se compara contra el de la cuenta en cada
+   * lectura: si cambió, el vínculo cambió y la sesión abierta deja de valer.
+   *
+   * Es **la única revocación que existe en este diseño**. La sesión es una cookie en
+   * un navegador ajeno: si el comerciante desvincula al cliente o la persona pierde
+   * el teléfono, nadie puede cerrarla — ni NexoPOS, ni ClubPay, ni nosotros.
+   */
+  linkedAt?: string;
 }
 
 export interface MerchantAccount {
   /** Id de la relación persona–comercio. Solo existe si la vinculación fue aceptada. */
   accountId: string;
   storeId: string;
+  /** Cómo se llama la persona. Para poder mostrar de quién es la libreta abierta. */
+  displayName?: string;
   storeName: string;
   storeSlug: string;
   /**
@@ -429,12 +446,19 @@ export interface MerchantAccount {
    * (D32). Mismo dato, dos objetos sociales distintos.
    */
   availableCents: number | null;
-  /** Día del mes en que cierra este comercio. Configurable por comercio (D27). */
-  closingDay: number;
+  /**
+   * Día del mes en que cierra este comercio. Configurable por comercio (D27).
+   *
+   * Opcional porque puede no venir: si no sabemos cuándo cierra, no lo decimos. Un
+   * "cierra el 1" inventado es peor que no decir nada (P6).
+   */
+  closingDay?: number;
   /** El comercio pausó el fiado. No bloquea la venta, solo el fiado (D35). */
   creditPaused: boolean;
   /** Compras a cuenta desde la tienda online. Arranca APAGADO (D34). */
   onlineCreditEnabled: boolean;
+  /** Ver `LinkSession.linkedAt`. Se mueve cuando el vínculo cambia, no al consultar. */
+  linkedAt?: string;
   /** La pila. Del más viejo al más nuevo (D28, D30). */
   statements: AccountStatement[];
 }
@@ -659,7 +683,7 @@ export interface NexoPosPort {
    * distinguir cuál de las tres: al que está parado en la tienda le da igual, y
    * decir "ya fue usado" le cuenta algo a quien esté probando tokens ajenos.
    */
-  redeemLinkToken(token: string): Promise<LinkSession | null>;
+  redeemLinkToken(token: string, storeId: string): Promise<LinkSession | null>;
 
   /**
    * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.

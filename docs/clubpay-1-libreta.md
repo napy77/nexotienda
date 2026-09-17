@@ -48,22 +48,20 @@ nosotros. Ya lo hablamos con ellos y están de acuerdo.
 
 El paso 3 ya está construido y probado de nuestro lado.
 
-## 2. Lo único que bloquea: devuelvan `storeId`
+## 2. El `storeId` que les íbamos a pedir: **no hace falta, olvídenlo**
 
-Hoy devuelven `{ account_id, external_id, persona }`. Falta decir **de qué comercio
-es la cuenta**.
+Si ya lo vieron en una versión anterior de este documento, dénlo de baja.
 
-Del lado de ustedes no hace falta, porque la clave del comercio ya lo dice. Pero en la
-cadena de arriba, el que tiene esa clave es NexoPOS — y **NexoTienda atiende todas las
-tiendas con la misma clave**.
+Habíamos pedido que el canje devolviera de qué comercio es la cuenta. NexoPOS lo
+resolvió mejor: **NexoTienda le manda el `storeId` en el pedido** —siempre lo sabe,
+porque el canje ocurre en `jure.nexotienda.app`— y con eso ellos saben con qué clave
+preguntarles a ustedes.
 
-Sin el `storeId` de vuelta, un token emitido para la libreta de Jure abre sesión en
-`delfin.nexotienda.app`. La comprobación ya está escrita y funcionando de nuestro lado
-—probamos con un token de otra tienda y lo rechaza— pero **necesita que el canje diga
-de qué tienda es**.
+Y ahí la protección sale sola: si el token es de Jure y se canjea diciendo "tienda de
+Delfín", **ustedes lo validan contra la clave de Delfín y no coincide**. Lo que les
+pedíamos como campo nuevo ya lo hacía su propio diseño.
 
-Es la diferencia entre una comprobación que hacemos nosotros y una que tenemos que
-creerle a quien trajo el token.
+No agreguen nada. Un campo que nadie lee envejece peor que no tenerlo.
 
 ## 3. La URL de la tienda: no hay patrón, y no conviene que lo inventen
 
@@ -132,9 +130,12 @@ problema de los datos mal tipeados deja de existir para todo cliente nuevo.
 
 ## En orden
 
-1. Devolver `storeId` en el canje ← **es lo único que bloquea**
-2. Recibir `storefrontSlug` y `storefrontPublished` en la ficha del comercio
-3. Agregar "Ir a la tienda" en Mis comercios
+1. Recibir `storefrontSlug` y `storefrontPublished` en la ficha del comercio
+2. Agregar "Ir a la tienda" en Mis comercios
+3. Aceptar iniciar una vinculación desde un QR escaneado (el pedido viene de NexoPOS)
+
+**Ya no hay nada que los bloquee de nuestro lado.** El canje está construido y probado
+de punta a punta contra datos de prueba.
 
 Lo tercero es lo único que espera un build de app, y por eso conviene que sea lo
 último: cuando el botón exista, todo el camino de atrás ya va a estar hecho y probado.
