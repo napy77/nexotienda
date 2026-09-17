@@ -445,6 +445,20 @@ export interface Order {
   /** Quién canceló: el comercio, el comprador, o el vencimiento automático (D19). */
   cancelledBy?: 'comercio' | 'comprador' | 'vencimiento';
   cancelledAt?: string;
+  /**
+   * El total no es el que el comprador vio al apretar el botón.
+   *
+   * Pasa cuando una campaña arranca o termina con el changuito cargado: alguien
+   * pone cosas a las siete, se va a comer, vuelve a las nueve y la promo venció.
+   * El precio que vale es el del POS —siempre lo fue—, pero enterarse en silencio
+   * es lo que no puede pasar: si subió, la persona se comprometió a un número y le
+   * están cobrando otro.
+   *
+   * `expectedTotalCents` es lo que había mostrado la pantalla, devuelto tal cual
+   * se mandó, para poder decir la diferencia en vez de solo el resultado.
+   */
+  priceChanged?: boolean;
+  expectedTotalCents?: number;
 }
 
 export interface NewOrder {
@@ -461,6 +475,15 @@ export interface NewOrder {
   accountId?: string;
   /** Para poder avisarle del pedido a quien compró sin cuenta. */
   contact?: { name: string; phone: string };
+  /**
+   * El total que la pantalla le mostró al comprador cuando apretó el botón.
+   *
+   * No es para que NexoPOS lo cobre —el precio que vale es el de ellos, y eso no
+   * se discute—: es para que pueda **avisar que cambió**. Sin este dato no hay
+   * forma de distinguir un precio que se movió de un comprador que nunca vio un
+   * total, y la diferencia se descubriría recién al pagar.
+   */
+  expectedTotalCents?: number;
 }
 
 // ---------------------------------------------------------------------------

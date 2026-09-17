@@ -167,6 +167,39 @@ export default async function PedidoPage({
             </div>
           </dl>
 
+          {/*
+            El precio se movió entre que armó el changuito y que lo mandó: empezó o
+            terminó una campaña en el medio.
+
+            Los dos casos no se cuentan igual. Que **baje** es una buena noticia y
+            alcanza con decirla. Que **suba** es otra cosa: la persona se comprometió
+            con un número y le están cobrando otro, y el pedido ya está hecho. Lo
+            único honesto ahí es mostrar la diferencia con todas las letras y darle la
+            salida mientras todavía se puede —el comercio no lo aceptó todavía—, que
+            es la misma válvula de siempre: que hablen las dos personas.
+          */}
+          {order.priceChanged && order.expectedTotalCents !== undefined && (
+            order.totalCents > order.expectedTotalCents ? (
+              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm font-bold text-amber-900">El precio subió</p>
+                <p className="mt-1 text-sm leading-relaxed text-amber-900">
+                  Cuando lo mandaste decía {money(order.expectedTotalCents)} y quedó en{' '}
+                  {money(order.totalCents)} —{' '}
+                  {money(order.totalCents - order.expectedTotalCents)} más. Puede que
+                  haya terminado una promoción.
+                  {order.status === 'recibido' &&
+                    ` ${store.name} todavía no lo aceptó: si no te sirve, decíselo con el botón de acá abajo.`}
+                </p>
+              </div>
+            ) : order.totalCents < order.expectedTotalCents ? (
+              <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
+                <span className="font-bold">Te salió más barato.</span> Cuando lo
+                mandaste decía {money(order.expectedTotalCents)} y quedó en{' '}
+                {money(order.totalCents)}.
+              </p>
+            ) : null
+          )}
+
           {order.paymentStatus === 'pendiente' && (
             <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
               El pedido ya le llegó a {store.name}, pero el pago quedó sin completar.

@@ -130,6 +130,9 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         paymentMethod: payment,
         accountId: payment === 'cuenta_corriente' ? account?.accountId : undefined,
         contact: account ? undefined : { name: name.trim(), phone: phone.trim() },
+        // Lo que esta pantalla le mostró recién. No es para cobrar —eso lo calcula
+        // NexoPOS— sino para que pueda avisar si no coincide.
+        expectedTotalCents: totalCents,
       });
       if (!res.ok) {
         setFalla(res.error);

@@ -438,6 +438,12 @@ export const fixtures: NexoPosPort = {
     const free = store.freeDeliveryOverCents !== undefined && subtotalCents >= store.freeDeliveryOverCents;
     const feeCents = slot.kind === 'reparto' && !free ? (slot.feeCents ?? 0) : 0;
 
+    const totalCents = subtotalCents + feeCents;
+    // Igual que NexoPOS: el total que vale es el de acá, pero si no coincide con el
+    // que el comprador tenía en pantalla, se avisa en vez de corregir en silencio.
+    const priceChanged =
+      input.expectedTotalCents !== undefined && input.expectedTotalCents !== totalCents;
+
     const code = `ORD-${String(seq++).padStart(4, '0')}`;
     const order: Order = {
       code,
@@ -448,7 +454,9 @@ export const fixtures: NexoPosPort = {
       lines,
       subtotalCents,
       feeCents,
-      totalCents: subtotalCents + feeCents,
+      totalCents,
+      priceChanged: priceChanged || undefined,
+      expectedTotalCents: priceChanged ? input.expectedTotalCents : undefined,
       slotId: slot.id,
       slotLabel: slot.label,
       slotKind: slot.kind,
