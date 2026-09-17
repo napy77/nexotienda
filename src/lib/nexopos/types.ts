@@ -407,6 +407,37 @@ export interface LinkSession {
   linkedAt?: string;
 }
 
+/**
+ * Abrir la libreta en una pantalla que no es la del teléfono.
+ *
+ * El caso: la tienda abierta en la computadora de casa y ClubPay en el celular. Con
+ * el handoff de la app no alcanza —abre la tienda *en el teléfono*— y no hay forma de
+ * que la PC demuestre quién es.
+ *
+ * El mecanismo es el de emparejar dos pantallas, y **la primera versión usa un código
+ * corto y no un QR**. Nadie escanea la pantalla de su propia compu con la compu, así
+ * que el QR obliga al teléfono, y eso pide trabajo de cámara del lado de ClubPay que
+ * hoy solo existe para cobrar. Un código de cinco caracteres que se lee de una
+ * pantalla y se tipea en la otra no necesita nada de eso.
+ *
+ * Y tiene una propiedad que el QR no: **un código que hay que leer de tu propia
+ * pantalla no se reenvía por WhatsApp.** Una imagen de QR sí, y ahí alguien te hace
+ * abrir tu libreta en la pantalla de otro.
+ */
+export interface Pairing {
+  /** Lo guarda el navegador que lo pidió. Sin esto, la aprobación no sirve. */
+  requestId: string;
+  /** Lo que la persona lee en la pantalla grande y tipea en la app. */
+  code: string;
+  expiresAt: string;
+}
+
+export type PairingStatus =
+  | { status: 'pendiente' }
+  /** Aprobado desde la app: viene el mismo token de un solo uso del handoff. */
+  | { status: 'listo'; token: string }
+  | { status: 'vencido' };
+
 export interface MerchantAccount {
   /** Id de la relación persona–comercio. Solo existe si la vinculación fue aceptada. */
   accountId: string;
@@ -685,6 +716,13 @@ export interface NexoPosPort {
    * decir "ya fue usado" le cuenta algo a quien esté probando tokens ajenos.
    */
   redeemLinkToken(token: string, storeId: string): Promise<LinkSession | null>;
+  /**
+   * Abre un pedido de emparejamiento para esta tienda. Devuelve `null` si todavía
+   * no existe del otro lado: la pantalla ofrece el camino por el teléfono y listo.
+   */
+  openPairing(storeId: string): Promise<Pairing | null>;
+  /** ¿Ya lo aprobaron desde la app? */
+  pollPairing(storeId: string, requestId: string): Promise<PairingStatus>;
 
   /**
    * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.

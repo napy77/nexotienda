@@ -35,6 +35,8 @@ import type {
   CategoryNode,
   Highlights,
   LinkSession,
+  Pairing,
+  PairingStatus,
   MerchantAccount,
   NewOrder,
   NexoPosPort,
@@ -367,6 +369,34 @@ export const client: NexoPosPort = {
       // de "volvé a entrar desde ClubPay", no un error del servidor.
       console.error('[nexotienda] canje de token falló', e);
       return null;
+    }
+  },
+
+  async openPairing(storeId) {
+    try {
+      const r = await cuentas<Pairing | null>('/v1/cuentas/emparejar', {
+        method: 'POST',
+        body: JSON.stringify({ storeId }),
+      });
+      return r?.requestId && r.code ? r : null;
+    } catch (e) {
+      // Que no exista todavía no es un error que mostrar: la pantalla ofrece el
+      // camino por el teléfono, que siempre funciona.
+      console.error('[nexotienda] no se pudo abrir el emparejamiento', e);
+      return null;
+    }
+  },
+
+  async pollPairing(storeId, requestId) {
+    try {
+      const r = await cuentas<PairingStatus>(
+        `/v1/cuentas/emparejar/${encodeURIComponent(requestId)}?storeId=${encodeURIComponent(storeId)}`,
+      );
+      return r?.status === 'listo' || r?.status === 'vencido' ? r : { status: 'pendiente' };
+    } catch (e) {
+      // Un error de red en un sondeo no es que se venció: se vuelve a preguntar.
+      console.error('[nexotienda] fallo al consultar el emparejamiento', e);
+      return { status: 'pendiente' };
     }
   },
 

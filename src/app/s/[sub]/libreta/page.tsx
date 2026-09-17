@@ -5,6 +5,7 @@ import { libretaDeLaSesion } from '@/lib/libreta';
 import { money, longDate } from '@/lib/format';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { PayAccount } from '@/components/PayAccount';
+import { EntrarEnEstaPantalla } from '@/components/EntrarEnEstaPantalla';
 
 /**
  * La libreta CON ESTE COMERCIO.
@@ -48,6 +49,14 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
           <p className="mt-3 text-sm text-neutral-500">
             Igual podés comprar: elegís pagar al recibirlo y listo.
           </p>
+
+          {/*
+            El caso de la computadora de casa: la tienda en una pantalla y ClubPay en
+            la otra. Va acá y no en el checkout porque es donde alguien llega cuando
+            busca su libreta y no la encuentra.
+          */}
+          <EntrarEnEstaPantalla store={store} />
+
           <div className="mt-5 flex justify-center">
             <ContactButton store={store} />
           </div>
