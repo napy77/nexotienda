@@ -30,31 +30,57 @@ GET /v1/stores/:id/products?pasillo=almacen&sub=Aceites&q=girasol&limit=60&offse
 Mientras tanto seguimos pidiendo todo y cortando acá. Funciona, pero es una consulta
 de siete mil filas por cada góndola que alguien toca.
 
-## 2. El árbol: rubros y subrubros
+## 2. El árbol: nos falta el nivel del medio
 
-Hoy mandan `Pasillo` con `subCategories: string[]`. Parándose en "Almacén" faltan
-niveles: están los rubros de abajo y los subrubros de esos.
+Este es el que más se nota. En Delfín, tocar **Almacén** hoy escupe cuarenta y pico de
+botones en una pared: "Aceites de girasol", "Aceites de maíz", "Aceites de oliva",
+"Acetos, Vinagres y Limón", "Alfajores", "Arroz", "Bizcochuelos", "Bolsas
+saborizadoras"…
 
-**Mándennos el árbol que tienen de verdad, con la profundidad que tenga.** Si es de
-tres niveles, que venga de tres:
+El aceite de oliva de Delfín está en **Almacén → Aceites y aderezos → Aceites de
+oliva**. Nosotros recibimos el primero y el tercero, y el del medio no existe en
+ningún campo que nos llegue. Así que los tres niveles terminan aplastados en uno, y
+"Aceites de oliva" queda al lado de "Alfajores" sin ninguna pista de que no son
+hermanos.
+
+**Mándennos el árbol con la profundidad que tenga:**
 
 ```ts
-interface Nodo { id: string; name: string; children?: Nodo[] }
-GET /v1/stores/:id/pasillos   →   Nodo[]
+interface CategoryNode { name: string; children?: CategoryNode[] }
+
+GET /v1/stores/:id/pasillos
+[{ id: "almacen", name: "Almacén", children: [
+    { name: "Aceites y aderezos", children: [
+        { name: "Aceites de oliva" },
+        { name: "Aceites de girasol" },
+        { name: "Aceites de maíz" } ] },
+    { name: "Alfajores" } ] }]
 ```
 
-Dos cosas para que no los sorprendan:
+**La clave es el nombre, no un id**, porque es lo que el producto ya trae en su
+`subCategory`. Meter ids obligaría a cambiar también el producto, y el nombre alcanza:
+es único dentro de su rama.
 
-**Solo dibujamos lo que tiene productos.** Un subrubro vacío ofrecido en pantalla es
-prometer una góndola y entregar un cartel de "no hay nada": el que lo toca no piensa
-"qué raro, está vacío", piensa que la tienda anda mal. Así que si mandan el árbol
-completo del catálogo maestro, nos las arreglamos — pero es información que ustedes
-ya tienen y nosotros tenemos que deducir.
+Del lado nuestro ya está construido y andando: se muestra **un nivel por vez**. Tocás
+Almacén y aparecen los rubros; tocás "Aceites y aderezos" y recién ahí aparecen oliva,
+girasol y maíz. Si mandan una lista plana —lo de hoy— se comporta como un árbol de un
+nivel y no se rompe nada. Cuando manden el árbol, aparece solo.
 
-**Hoy lo deducimos de los productos.** Mientras el árbol no llegue, los subrubros de
-una góndola los sacamos de los `subCategory` de los productos que tiene. Funciona y ya
-está andando, pero es una deducción: si un producto tiene el subrubro mal escrito,
-aparece un subrubro nuevo en la tienda.
+Tres cosas más:
+
+**Solo dibujamos lo que tiene mercadería.** Una rama vacía ofrecida en pantalla
+promete una góndola y entrega un cartel de "no hay nada": el que la toca no piensa
+"qué raro, está vacío", piensa que la tienda anda mal. Manden el árbol completo del
+catálogo maestro si es más fácil — lo podamos nosotros.
+
+**Un producto puede colgar del rubro o de la hoja.** Hay comercios que clasifican
+fino y otros que dejan todo en "Aceites y aderezos". Aceptamos las dos: al elegir un
+rubro entran también los productos que están colgados directamente de él. No hace
+falta que normalicen nada.
+
+**Lo que hoy deducimos.** Mientras el árbol no llegue, los subrubros salen de los
+`subCategory` de los productos. Funciona, pero es una deducción: si un producto tiene
+el subrubro mal escrito, aparece una rama nueva en la tienda.
 
 ## 3. Lo más vendido y lo más buscado
 

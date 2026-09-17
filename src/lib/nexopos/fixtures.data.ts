@@ -378,7 +378,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     name: 'Aceite de Girasol Natura Botella 1.5L',
     brand: 'Natura',
     pasilloId: 'despensa',
-    subCategory: 'Aceites y Aderezos',
+    subCategory: 'Aceites de girasol',
     price: 3150,
     unit: '1.5 Litros',
     imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&q=80',

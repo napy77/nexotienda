@@ -11,6 +11,7 @@ import {
 } from './fixtures.data';
 import type {
   Campaign,
+  CategoryNode,
   AccountEntry,
   Availability,
   MerchantAccount,
@@ -91,6 +92,38 @@ function mapProduct(p: (typeof INITIAL_PRODUCTS)[number]): Product {
     ean: p.ean,
     availability: mapAvailability(p),
   };
+}
+
+/**
+ * El árbol de tres niveles que le pedimos a NexoPOS, puesto en una góndola para
+ * poder verlo funcionar: Despensa → "Aceites y Aderezos" → de oliva / girasol / maíz.
+ *
+ * El resto de las góndolas sigue con la lista plana, que es el estado real de hoy.
+ * Que convivan no es una concesión: es lo que va a pasar de verdad mientras cada
+ * comercio ordene su catálogo.
+ */
+const ARBOLES: Record<string, CategoryNode[]> = {
+  despensa: [
+    {
+      name: 'Aceites y Aderezos',
+      children: [
+        { name: 'Aceites de oliva' },
+        { name: 'Aceites de girasol' },
+        { name: 'Aceites de maíz' },
+        { name: 'Vinagres' },
+        { name: 'Mayonesa, Ketchup y Mostaza' },
+      ],
+    },
+    { name: 'Arroz y Legumbres' },
+    { name: 'Fideos y Pastas' },
+    { name: 'Galletitas y Snacks' },
+    { name: 'Café, Té y Yerba' },
+  ],
+};
+
+function conArbol(p: Pasillo): Pasillo {
+  const children = ARBOLES[p.id];
+  return children ? { ...p, children } : p;
 }
 
 /**
@@ -344,7 +377,7 @@ export const fixtures: NexoPosPort = {
 
   async listPasillos(storeId) {
     const ids = new Set(visibles(storeId).map((p) => p.pasilloId));
-    return (PASILLOS as Pasillo[]).filter((p) => ids.has(p.id));
+    return (PASILLOS as Pasillo[]).filter((p) => ids.has(p.id)).map(conArbol);
   },
 
   async listProducts(storeId) {

@@ -4,8 +4,58 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
-import type { Pasillo, Product, Store } from '@/lib/nexopos/types';
+import type { CategoryNode, Pasillo, Product, Store } from '@/lib/nexopos/types';
+import { hijosEn } from '@/lib/arbol';
 import { ProductCard } from './ProductCard';
+
+/**
+ * Una fila de chips que no se desborda.
+ *
+ * Una góndola de un supermercado real tiene cuarenta ramas. Cuarenta botones
+ * apilados no son un índice: son una pared, y la pared se saltea. Se muestran los
+ * primeros y el resto queda atrás de un botón, que es una decisión de quien mira y
+ * no nuestra.
+ */
+const A_LA_VISTA = 12;
+
+function ChipRow({
+  items,
+  className = '',
+}: {
+  items: { key: string; label: string; href: string; active: boolean }[];
+  className?: string;
+}) {
+  const [todo, setTodo] = useState(false);
+  if (items.length === 0) return null;
+
+  const hayDeMas = !todo && items.length > A_LA_VISTA + 2;
+  const visibles = hayDeMas ? items.slice(0, A_LA_VISTA) : items;
+
+  const chip = (activo: boolean) =>
+    `rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+      activo
+        ? 'bg-neutral-900 text-white'
+        : 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
+    }`;
+
+  return (
+    <div className={`flex flex-wrap gap-2 ${className}`}>
+      {visibles.map((i) => (
+        <Link key={i.key} href={i.href} className={chip(i.active)}>
+          {i.label}
+        </Link>
+      ))}
+      {hayDeMas && (
+        <button
+          onClick={() => setTodo(true)}
+          className="rounded-full border border-dashed border-neutral-400 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+        >
+          Ver los {items.length - A_LA_VISTA} restantes
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * El buscador y el árbol de la tienda, y la grilla cuando hay algo que mostrar.
@@ -27,8 +77,8 @@ export function StoreBrowser({
   store,
   pasillos,
   pasilloId,
-  subCategory,
-  subCategories,
+  ruta,
+  arbol,
   query,
   products,
   total,
@@ -38,9 +88,10 @@ export function StoreBrowser({
   store: Store;
   pasillos: Pasillo[];
   pasilloId?: string;
-  subCategory?: string;
-  /** Los subrubros que existen de verdad en esta góndola. */
-  subCategories: string[];
+  /** El camino elegido dentro de la góndola: `['Aceites y Aderezos', 'De oliva']`. */
+  ruta: string[];
+  /** El árbol de la góndola, ya podado a lo que tiene productos. */
+  arbol: CategoryNode[];
   query: string;
   products: Product[];
   total: number;
@@ -61,13 +112,28 @@ export function StoreBrowser({
 
   const pasilloActual = pasillos.find((p) => p.id === pasilloId);
 
-  function chip(activo: boolean) {
-    return `rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-      activo
-        ? 'bg-neutral-900 text-white'
-        : 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
-    }`;
+  /** La URL de un camino dentro de la góndola actual. */
+  function url(camino: string[]) {
+    const qs = new URLSearchParams();
+    if (pasilloId) qs.set('p', pasilloId);
+    for (const paso of camino) qs.append('s', paso);
+    return `${base}?${qs.toString()}`;
   }
+
+  /*
+    Un nivel por vez, y solo el del camino elegido.
+
+    "Almacén" no se abre en cuarenta subrubros: se abre en rubros, y recién el rubro
+    en sus hojas. Mostrar los tres niveles juntos es lo que convertía la góndola en
+    un muro de botones donde "Aceites de oliva" quedaba entre "Alfajores" y "Arroz",
+    sin ninguna pista de que los tres no son hermanos.
+  */
+  const niveles = pasilloActual
+    ? Array.from({ length: ruta.length + 1 }, (_, i) => ({
+        prefijo: ruta.slice(0, i),
+        hijos: hijosEn(arbol, ruta.slice(0, i)),
+      })).filter((n) => n.hijos.length > 0)
+    : [];
 
   return (
     <>
@@ -101,50 +167,48 @@ export function StoreBrowser({
           </button>
         </form>
 
-        {pasillos.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {/*
-              No hay chip de "Todo". Era el que abría siete mil productos de una, y es
-              justo lo que nadie va a recorrer: el que entra arranca por la portada,
-              por una góndola o escribiendo una palabra.
-            */}
-            {navegando && (
-              <Link href={base} className={chip(false)}>
-                ← Inicio
-              </Link>
-            )}
-            {pasillos.map((p) => (
-              <Link
-                key={p.id}
-                href={`${base}?p=${encodeURIComponent(p.id)}`}
-                className={chip(pasilloId === p.id)}
-              >
-                {p.name}
-              </Link>
-            ))}
-          </div>
-        )}
+        {/*
+          No hay chip de "Todo". Era el que abría siete mil productos de una, y es
+          justo lo que nadie va a recorrer: el que entra arranca por la portada, por
+          una góndola o escribiendo una palabra.
+        */}
+        <ChipRow
+          items={[
+            ...(navegando
+              ? [{ key: '__inicio', label: '← Inicio', href: base, active: false }]
+              : []),
+            ...pasillos.map((p) => ({
+              key: p.id,
+              label: p.name,
+              href: `${base}?p=${encodeURIComponent(p.id)}`,
+              active: pasilloId === p.id,
+            })),
+          ]}
+        />
 
-        {/* Los subrubros de la góndola en la que estoy parado. */}
-        {pasilloActual && subCategories.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-t border-neutral-200 pt-3">
-            <Link
-              href={`${base}?p=${encodeURIComponent(pasilloActual.id)}`}
-              className={chip(!subCategory)}
-            >
-              Todo {pasilloActual.name}
-            </Link>
-            {subCategories.map((sc) => (
-              <Link
-                key={sc}
-                href={`${base}?p=${encodeURIComponent(pasilloActual.id)}&s=${encodeURIComponent(sc)}`}
-                className={chip(subCategory === sc)}
-              >
-                {sc}
-              </Link>
-            ))}
-          </div>
-        )}
+        {niveles.map(({ prefijo, hijos }, i) => (
+          <ChipRow
+            key={i}
+            className="border-t border-neutral-200 pt-3"
+            items={[
+              {
+                key: '__todo',
+                label:
+                  prefijo.length === 0
+                    ? `Todo ${pasilloActual!.name}`
+                    : `Todo ${prefijo[prefijo.length - 1]}`,
+                href: url(prefijo),
+                active: ruta.length === prefijo.length,
+              },
+              ...hijos.map((h: CategoryNode) => ({
+                key: h.name,
+                label: h.name,
+                href: url([...prefijo, h.name]),
+                active: ruta[prefijo.length] === h.name,
+              })),
+            ]}
+          />
+        ))}
       </div>
 
       {!navegando ? (
@@ -170,7 +234,7 @@ export function StoreBrowser({
               <>
                 {total} {total === 1 ? 'producto' : 'productos'} en{' '}
                 <span className="font-semibold text-neutral-800">
-                  {subCategory ?? pasilloActual?.name}
+                  {ruta[ruta.length - 1] ?? pasilloActual?.name}
                 </span>
               </>
             )}
@@ -190,12 +254,7 @@ export function StoreBrowser({
           {total > products.length && (
             <div className="mt-6 text-center">
               <Link
-                href={`?${new URLSearchParams({
-                  ...(pasilloId ? { p: pasilloId } : {}),
-                  ...(subCategory ? { s: subCategory } : {}),
-                  ...(query ? { q: query } : {}),
-                  n: String(limit + 60),
-                }).toString()}`}
+                href={`${query ? `${base}?q=${encodeURIComponent(query)}` : url(ruta)}&n=${limit + 60}`}
                 className="inline-block rounded-lg border border-neutral-300 bg-white px-5 py-2.5 text-sm font-bold text-neutral-800 hover:bg-neutral-50"
               >
                 Ver más ({total - products.length} restantes)

@@ -129,12 +129,37 @@ export interface Highlights {
   mostSearched: string[];
 }
 
+/**
+ * Un nodo del árbol de una góndola.
+ *
+ * La clave es el **nombre**, no un id, porque es lo que el producto trae en su
+ * `subCategory`. Meter ids obligaría a cambiar también el producto, y el nombre ya
+ * es único dentro de su rama.
+ */
+export interface CategoryNode {
+  name: string;
+  children?: CategoryNode[];
+}
+
 export interface Pasillo {
   id: string;
   name: string;
   iconName?: string;
   imageUrl?: string;
+  /** Las hojas declaradas, plano. Queda por compatibilidad: lo que se usa es `children`. */
   subCategories: string[];
+  /**
+   * El árbol de la góndola, con la profundidad que tenga.
+   *
+   * "Almacén" no se abre en cuarenta subrubros: se abre en rubros —"Aceites y
+   * aderezos"— y recién ese en "de oliva", "de girasol", "de maíz". Aplastar los
+   * tres niveles en uno es lo que convierte una góndola en un muro de cuarenta
+   * botones, que es exactamente lo que nadie lee.
+   *
+   * Si NexoPOS manda solo `subCategories`, el adapter arma un árbol de un nivel y
+   * todo se comporta como antes.
+   */
+  children?: CategoryNode[];
   productCount: number;
 }
 

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import type { Pasillo, Product } from '@/lib/nexopos/types';
+import type { CategoryNode, Pasillo, Product } from '@/lib/nexopos/types';
+import { arbolDe, podar, productosDe } from '@/lib/arbol';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
@@ -20,6 +21,18 @@ type Props = {
 function uno(v: string | string[] | undefined): string | undefined {
   const x = Array.isArray(v) ? v[0] : v;
   return x?.trim() ? x.trim() : undefined;
+}
+
+/**
+ * El camino dentro de la góndola, como `s` repetido:
+ * `?p=despensa&s=Aceites+y+Aderezos&s=Aceites+de+oliva`.
+ *
+ * Repetir el parámetro en vez de inventar `s`, `s2`, `s3` es lo que deja que el
+ * árbol tenga la profundidad que tenga sin volver a tocar esto.
+ */
+function camino(v: string | string[] | undefined): string[] {
+  const xs = Array.isArray(v) ? v : v ? [v] : [];
+  return xs.map((x) => x.trim()).filter(Boolean).slice(0, 6);
 }
 
 const DE_A = 60;
@@ -114,7 +127,7 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
 
   const sp = await searchParams;
   const pasilloId = uno(sp.p);
-  const subCategory = uno(sp.s);
+  const ruta = camino(sp.s);
   const query = uno(sp.q) ?? '';
   const limit = Math.min(Math.max(Number(uno(sp.n)) || DE_A, DE_A), 600);
   const navegando = Boolean(pasilloId || query);
@@ -132,6 +145,34 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
   // baja el pedazo — no las siete mil fichas para que elija cuál pintar.
   const q = query.toLowerCase();
   const delPasillo = pasilloId ? todos.filter((p) => p.pasilloId === pasilloId) : [];
+
+  /*
+    El árbol de la góndola, podado a lo que tiene mercadería, y con lo que los
+    productos declaran y el árbol no menciona colgado al final.
+
+    El árbol es una declaración y los productos son el hecho. Ofrecer una rama vacía
+    promete una góndola y entrega un cartel; esconder un subrubro que tiene productos
+    porque nadie lo declaró es perder media góndola. Se cruzan los dos.
+  */
+  const conProductos = new Set(
+    delPasillo.map((p) => p.subCategory).filter((x): x is string => Boolean(x)),
+  );
+  const declarado = podar(arbolDe(pasillos.find((p) => p.id === pasilloId)), conProductos);
+  const nombrados = new Set<string>();
+  const anotar = (ns: CategoryNode[]) =>
+    ns.forEach((n) => {
+      nombrados.add(n.name);
+      anotar(n.children ?? []);
+    });
+  anotar(declarado);
+  const arbol = [
+    ...declarado,
+    ...[...conProductos]
+      .filter((sc) => !nombrados.has(sc))
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ name })),
+  ];
+
   const encontrados = query
     ? todos.filter(
         (p) =>
@@ -139,26 +180,7 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
           (p.brand ?? '').toLowerCase().includes(q) ||
           (p.subCategory ?? '').toLowerCase().includes(q),
       )
-    : subCategory
-      ? delPasillo.filter((p) => p.subCategory === subCategory)
-      : delPasillo;
-
-  /*
-    Los subrubros de la góndola, sacados de los productos que tiene de verdad.
-
-    El `subCategories` del pasillo es una declaración y esto es el hecho: si NexoPOS
-    manda un subrubro que no tiene ningún producto, ofrecerlo es prometer una
-    pantalla vacía; si tiene productos con un subrubro que no está declarado, no
-    ofrecerlo es esconder media góndola. Se toman los dos y se cruzan.
-  */
-  const declarados = pasillos.find((p) => p.id === pasilloId)?.subCategories ?? [];
-  const conProductos = new Set(
-    delPasillo.map((p) => p.subCategory).filter((x): x is string => Boolean(x)),
-  );
-  const subCategories = [
-    ...declarados.filter((sc) => conProductos.has(sc)),
-    ...[...conProductos].filter((sc) => !declarados.includes(sc)).sort((a, b) => a.localeCompare(b)),
-  ];
+    : productosDe(delPasillo, arbol, ruta);
 
   // Para la portada alcanza con lo que las estanterías nombran.
   const deEstanterias = navegando
@@ -179,8 +201,8 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
         store={store}
         pasillos={pasillos}
         pasilloId={pasilloId}
-        subCategory={subCategory}
-        subCategories={subCategories}
+        ruta={ruta}
+        arbol={arbol}
         query={query}
         products={navegando ? encontrados.slice(0, limit) : []}
         total={encontrados.length}
