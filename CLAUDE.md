@@ -7,10 +7,10 @@ comprador viven en **ClubPay**.
 El diseño completo está en el documento fundacional (v0.2), con cada decisión numerada
 `D1`–`D44`, los principios `P1`–`P6`, los riesgos `R1`–`R9` y lo abierto `A1`–`A7`.
 Cuando algo de acá no alcance, la referencia es ese documento.
-Lo que le pedimos a NexoPOS —y lo que tiene que construir de su lado— está en
-[docs/nexopos.md](docs/nexopos.md), con la segunda tanda en
-[docs/nexopos-2-tienda-real.md](docs/nexopos-2-tienda-real.md) y lo que falta para
-cerrar un carrito en [docs/nexopos-3-pedidos.md](docs/nexopos-3-pedidos.md).
+Lo que se coordina con los otros dos equipos vive en [docs/](docs/README.md), con
+**una carpeta por destinatario**: `a-nexopos/`, `a-clubpay/` e `interno/`. Casi todo
+eso se reenvía tal cual, así que **un archivo tiene un solo destinatario** — si algo
+le toca a los dos equipos, se parte en dos y se repite lo compartido.
 
 ## El subdominio
 

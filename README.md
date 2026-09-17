@@ -5,7 +5,7 @@ catálogo maestro de **Nexo B2B**; la identidad, la cuenta corriente y el pago d
 comprador viven en **ClubPay**.
 
 - Las reglas de producto que el código no puede violar están en [CLAUDE.md](CLAUDE.md).
-- Todo lo que tiene que construir y exponer NexoPOS está en [docs/nexopos.md](docs/nexopos.md).
+- Lo que se coordina con NexoPOS y con ClubPay está en [docs/](docs/README.md), una carpeta por destinatario.
 
 ## Correr en desarrollo
 

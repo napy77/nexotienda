@@ -15,7 +15,7 @@ export const mercadoPagoPayments: PaymentsPort = {
   async createIntent() {
     throw new Error(
       'Mercado Pago todavía no está implementado. Falta el onboarding del comercio ' +
-        'como vendedor en el marketplace y las credenciales. Ver docs/nexopos.md.',
+        'como vendedor en el marketplace y las credenciales. Ver docs/a-nexopos/nexopos.md.',
     );
   },
   async getIntent() {

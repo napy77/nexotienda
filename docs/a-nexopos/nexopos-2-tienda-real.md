@@ -2,7 +2,7 @@
 
 > **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
 
-Continuación de `docs/nexopos.md`, con lo que hace falta para pasar de fixtures a
+Continuación de `nexopos.md`, con lo que hace falta para pasar de fixtures a
 comercios reales. Seis definiciones nuevas.
 
 **Contexto:** NexoTienda ya está en producción con HTTPS en `nexotienda.app`. Corre
