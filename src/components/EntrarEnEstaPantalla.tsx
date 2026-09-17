@@ -23,6 +23,13 @@ import {
  *
  * El `requestId` nunca llega acá: vive en una cookie `httpOnly`. Aunque alguien
  * aprobara un pedido ajeno, solo el navegador que lo abrió puede canjearlo.
+ *
+ * **Lo que esto NO resuelve**, y conviene que esté escrito: que el atacante abra el
+ * pedido en su computadora y convenza a la persona de tipear *ese* código en su
+ * ClubPay. Ahí la cookie no ayuda —el navegador que abrió el pedido es el del
+ * atacante— y la descripción del dispositivo tampoco, porque la escribe él. Lo único
+ * que ahí no controla es el nombre del comercio y la pregunta de la app: "si no
+ * fuiste vos, no confirmes".
  */
 type Estado =
   | { k: 'inicio' }

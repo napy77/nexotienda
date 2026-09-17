@@ -2,6 +2,13 @@
 
 > **Para el equipo de ClubPay.** Este archivo se manda tal cual.
 
+> ⚠️ **No construyan todavía.** Estamos evaluando invertir la dirección del código: que
+> lo genere la app y se tipee en la computadora, en lugar de al revés. Sería **un solo
+> endpoint en vez de dos y sin sondeo**, y pone el aviso de seguridad sobre una acción
+> que la gente ya tiene aprendida —"nunca dictes tu código"— en vez de sobre una que se
+> siente inofensiva. Les avisamos en cuanto esté decidido. El resto del documento
+> describe la versión de hoy.
+
 Apareció probando: **la tienda abierta en la computadora de casa y ClubPay en el
 celular.** El handoff que armamos no sirve ahí —abre la tienda *en el teléfono*— y la
 computadora no tiene forma de demostrar quién es.
@@ -82,9 +89,15 @@ Así que la pantalla no puede decir "¿Confirmás?". Tiene que decir qué está 
 > **Alguien está abriendo tu libreta de Jure Hnos SRL en otra pantalla.**
 > Si no sos vos, no confirmes. Nadie de Jure ni de ClubPay te va a pedir este código.
 
-Y si pueden, **algo de quién lo pidió**: "en una computadora con Chrome". Se lo podemos
-mandar en el pedido —es lo que dice el navegador de sí mismo, sin nada personal— y
-convierte una confirmación a ciegas en una que se puede contrastar.
+Mandamos también una descripción del que pide —"una computadora con Chrome"— **pero
+no la traten como prueba de nada.** En este ataque el que abre el pedido es el
+atacante, así que esa cadena la escribe él: nada le impide poner "tu iPhone". Sirve en
+el caso honesto —"sí, es mi compu"— y como color en la pantalla. Nada más.
+
+Lo único que ahí no controla el atacante es **el nombre del comercio**, porque ustedes
+lo deducen de la clave y no de lo que les mandamos, y **la pregunta**: "si no fuiste
+vos, no confirmes" no depende de ningún dato de nadie. La confirmación tiene que
+apoyarse en esos dos.
 
 Tres cosas más, cortas:
 

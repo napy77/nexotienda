@@ -49,11 +49,9 @@ apruebe un pedido ajeno, solo el navegador que lo abrió puede canjearlo.
 El pedido a ClubPay incluye una descripción corta del dispositivo que pide —"una
 computadora con Chrome"— para que la pantalla de confirmación de la app pueda mostrarla.
 
-**No es decoración: es la única defensa del mecanismo.** El ataque no es robarle el
-código a alguien —el código aparece en la pantalla del que lo pidió— sino al revés:
-que el atacante abra el pedido en su compu y convenza a la víctima de escribir *ese*
-código en su ClubPay. Una confirmación que solo dice "¿Confirmás?" no le da a la
-persona con qué darse cuenta.
+**No es prueba de nada, y esa frase estaba mal escrita acá antes.** En este ataque el
+que abre el pedido es el atacante, así que esa cadena la escribe él y puede poner "tu
+iPhone". Sirve en el caso honesto y como color; la defensa está en el nombre del
+comercio —que ClubPay deduce de la clave— y en la pregunta.
 
-Si el dato pasa por ustedes, que pase tal cual y sin agregarle nada: es lo que el
-navegador dice de sí mismo, no hace falta nada más.
+Que pase tal cual y sin agregarle nada.
