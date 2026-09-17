@@ -1,5 +1,7 @@
 # NexoTienda → NexoPOS: aceptado, y las cuatro decisiones
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Respuesta a `RESPUESTA-A-NEXOTIENDA.md`. Tres bloques: **lo que aceptamos y ya
 refactorizamos**, **las cuatro decisiones que pidieron**, y **una cosa que nos
 faltaba a nosotros**.

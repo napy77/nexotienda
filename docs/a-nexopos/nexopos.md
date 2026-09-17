@@ -1,5 +1,7 @@
 # Prompt para el equipo de NexoPOS
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 ## Rol
 
 Sos quien va a construir el lado de **NexoPOS** para que funcione NexoTienda: la

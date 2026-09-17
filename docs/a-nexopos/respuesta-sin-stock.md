@@ -1,5 +1,7 @@
 # Mostrar lo que no hay — respondido
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 `showsOutOfStock` leído y en uso. Los tres puntos, en orden:
 
 **1. No tenemos ese filtro, y nunca lo tuvimos.** No hay un "ver también los

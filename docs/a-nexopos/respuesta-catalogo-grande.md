@@ -1,5 +1,7 @@
 # Catálogo grande — migrado
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Los tres endpoints están consumidos y **ya podemos confirmar la migración**: se pide
 un pedazo, el árbol se recorre por ids y los destacados salen de ustedes.
 

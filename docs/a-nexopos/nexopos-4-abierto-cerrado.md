@@ -1,5 +1,7 @@
 # NexoPOS → saber si el comercio está abierto
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Los pedidos ya entran (`P-06D042E1`, gracias). Apareció otra cosa probándolo.
 
 Jure Hnos SRL estaba cerrado —abría a las 7:30 de la mañana siguiente— y el pedido se

@@ -1,5 +1,7 @@
 # La libreta en la tienda: cómo sabemos que sos vos
 
+> **Interno — no se manda a nadie.** Es el registro de por qué se decidió así.
+
 Documento para debatir, no para implementar todavía. Al final quedan las preguntas
 para ClubPay y para NexoPOS.
 

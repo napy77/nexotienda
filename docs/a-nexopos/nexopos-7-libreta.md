@@ -1,5 +1,7 @@
 # NexoPOS → la libreta en la tienda: el canje, y lo que confirmamos
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Su respuesta cerró casi todo. Queda **una cosa que cambia respecto de lo que
 propusieron**, y las respuestas a lo que nos preguntaron.
 

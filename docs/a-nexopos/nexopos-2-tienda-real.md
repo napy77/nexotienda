@@ -1,5 +1,7 @@
 # NexoPOS → segunda tanda: publicar tiendas de verdad
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Continuación de `docs/nexopos.md`, con lo que hace falta para pasar de fixtures a
 comercios reales. Seis definiciones nuevas.
 

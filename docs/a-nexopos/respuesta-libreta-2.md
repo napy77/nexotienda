@@ -1,5 +1,7 @@
 # La libreta: construido de este lado, y dos cosas que faltan del suyo
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Los cinco puntos consumidos y probados de punta a punta. Tenían razón en las dos
 correcciones, y las dos eran de las que se asumen al revés.
 

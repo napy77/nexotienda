@@ -1,5 +1,7 @@
 # Campañas — `expectedTotalCents` está mandado
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Lo del punto 4 ya viaja. En `POST /v1/orders` va ahora:
 
 ```ts

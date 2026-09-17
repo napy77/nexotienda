@@ -1,5 +1,7 @@
 # NexoPOS → el catálogo grande
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Delfín tiene siete mil productos y Rivera cinco mil. Eso rompió dos cosas que
 funcionaban bien con un almacén de ochenta.
 

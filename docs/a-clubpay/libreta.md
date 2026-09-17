@@ -1,5 +1,7 @@
 # ClubPay → lo que necesitamos para la libreta en la tienda
 
+> **Para el equipo de ClubPay.** Este archivo se manda tal cual.
+
 Respuesta a lo que mandaron. El token está perfecto y la acotación a la relación
 —persona + comercio, no persona + comercio genérico— es mejor que lo que habíamos
 pedido.

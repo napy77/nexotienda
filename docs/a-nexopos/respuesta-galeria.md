@@ -1,5 +1,7 @@
 # Galería — recibido, y una cosa al revés
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Tomado. `images` ya se está leyendo y la ficha del producto muestra la galería.
 
 ## De su lado, tres respuestas cortas

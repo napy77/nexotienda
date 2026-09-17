@@ -1,5 +1,7 @@
 # NexoPOS → lo que falta para cerrar un carrito
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Corto y concreto: el catálogo anda, la tienda de Jure navega con stock real, y el
 carrito no se puede cerrar porque `POST /v1/orders` todavía no existe.
 

@@ -1,5 +1,7 @@
 # NexoPOS → Campañas
 
+> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+
 Lo que sigue ya está construido del lado de NexoTienda y andando contra fixtures: la
 home muestra las secciones de ofertas, la cinta roja sobre la foto, y la página de
 "ver todas". Falta el endpoint.

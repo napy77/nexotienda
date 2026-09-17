@@ -1,8 +1,10 @@
 # La libreta: dónde se canja el token
 
+> **Interno — no se manda a nadie.** Es el registro de por qué se decidió así.
+
 **Registro interno.** Lo que hay que mandarle a cada equipo está partido en
-[clubpay-1-libreta.md](clubpay-1-libreta.md) y
-[nexopos-7-libreta.md](nexopos-7-libreta.md), cada uno completo por su cuenta. Acá
+[a-clubpay/libreta.md](../a-clubpay/libreta.md) y
+[a-nexopos/nexopos-7-libreta.md](../a-nexopos/nexopos-7-libreta.md), cada uno completo por su cuenta. Acá
 queda por qué se decidió así.
 
 Las dos respuestas llegaron y son buenas. Pero **proponían dos canjes distintos**, y
