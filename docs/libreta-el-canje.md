@@ -1,7 +1,12 @@
 # La libreta: dónde se canja el token
 
-Las dos respuestas llegaron y son buenas. Pero **proponen dos canjes distintos**, y
-hay que elegir uno antes de que alguien construya de más.
+**Registro interno.** Lo que hay que mandarle a cada equipo está partido en
+[clubpay-1-libreta.md](clubpay-1-libreta.md) y
+[nexopos-7-libreta.md](nexopos-7-libreta.md), cada uno completo por su cuenta. Acá
+queda por qué se decidió así.
+
+Las dos respuestas llegaron y son buenas. Pero **proponían dos canjes distintos**, y
+había que elegir uno antes de que alguien construyera de más.
 
 ```
 ClubPay:   NexoTienda → POST /pos/tienda/sessions   (X-API-Key: la clave de ese comercio)
