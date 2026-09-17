@@ -296,7 +296,10 @@ const accounts: MerchantAccount[] = [
     storeName: 'Súper SOL',
     storeSlug: 'supersol',
     availableCents: money(18500),
+    balanceCents: money(27519.20),
     closingDay: 10,
+    dueDay: 20,
+    currentPeriod: { from: '2026-09-11', to: '2026-10-10', dueDate: '2026-10-20' },
     creditPaused: false,
     onlineCreditEnabled: true,
     statements: [

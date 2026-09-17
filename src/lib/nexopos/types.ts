@@ -447,6 +447,15 @@ export interface MerchantAccount {
    */
   availableCents: number | null;
   /**
+   * Lo que esta persona le debe a este comercio, hoy.
+   *
+   * Es **el número que la persona vino a buscar**, y el único que puede contestarlo
+   * sin ambigüedad: sumar los resúmenes cerrados da otra cosa —deja afuera el período
+   * abierto— y la pila de períodos es para entender la deuda, no para calcularla. El
+   * que sabe cuánto se debe es el libro, que es NexoPOS.
+   */
+  balanceCents?: number;
+  /**
    * Día del mes en que cierra este comercio. Configurable por comercio (D27).
    *
    * Opcional porque puede no venir: si no sabemos cuándo cierra, no lo decimos. Un
@@ -457,6 +466,19 @@ export interface MerchantAccount {
   creditPaused: boolean;
   /** Compras a cuenta desde la tienda online. Arranca APAGADO (D34). */
   onlineCreditEnabled: boolean;
+  /**
+   * Día de vencimiento. "Cierra el 10" sin "vence el 20" es media frase.
+   */
+  dueDay?: number;
+  /**
+   * El período en curso, calculado por NexoPOS.
+   *
+   * La cuenta tiene una trampa que no conviene repetir de este lado: un cierre el 31
+   * en febrero es el 28, y el 29 en los bisiestos. Si la pantalla dice "cierra el 10
+   * de cada mes" alcanza `closingDay`; si alguna vez dice "cierra el 10 de octubre",
+   * el dato sale de acá y la cuenta la hace un solo lugar.
+   */
+  currentPeriod?: { from: string; to: string; dueDate?: string };
   /** Ver `LinkSession.linkedAt`. Se mueve cuando el vínculo cambia, no al consultar. */
   linkedAt?: string;
   /** La pila. Del más viejo al más nuevo (D28, D30). */

@@ -47,6 +47,20 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
   const closed = account.statements.filter((st) => st.status !== 'abierto');
   const owedCents = closed.reduce((a, st) => a + (st.totalCents - st.paidCents), 0);
 
+  /*
+    Cuánto debe, que es el número por el que entró.
+
+    **No se calcula sumando los resúmenes cerrados**: esa suma deja afuera el período
+    abierto, así que a alguien que compró ayer le diría de menos. La pila de períodos
+    sirve para *entender* la deuda, no para calcularla; el que sabe cuánto se debe es
+    el libro. Y si ese dato no viniera, no se inventa uno: no se muestra la línea.
+
+    Y el pago va por importe libre contra la cuenta, no contra un resumen elegido
+    (D31) — así que cuando hay saldo, se paga contra el saldo.
+  */
+  const debe = account.balanceCents;
+  const aPagarCents = debe ?? owedCents;
+
   // Los movimientos no vienen anidados: se piden aparte.
   const entriesByStatement = Object.fromEntries(
     await Promise.all(
@@ -65,7 +79,50 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
         Tu libreta con {store.name}
       </h1>
       {account.closingDay !== undefined && (
-        <p className="mb-6 text-sm text-neutral-600">Cierra el {account.closingDay} de cada mes.</p>
+        <p className="mb-6 text-sm text-neutral-600">
+          Cierra el {account.closingDay} de cada mes
+          {/* "Cierra el 10" sin "vence el 20" es media frase. */}
+          {account.dueDay !== undefined && ` y vence el ${account.dueDay}`}.
+        </p>
+      )}
+
+      {debe !== undefined && debe > 0 && (
+        <div className="mb-6 rounded-xl border border-neutral-200 bg-white p-5">
+          <p className="text-xs font-bold tracking-wider text-neutral-500 uppercase">
+            Le debés a {store.name}
+          </p>
+          <p className="mt-1 text-3xl font-black text-neutral-900">{money(debe)}</p>
+          {account.currentPeriod?.dueDate && (
+            <p className="mt-1 text-sm text-neutral-600">
+              El período en curso vence el {longDate(account.currentPeriod.dueDate)}.
+            </p>
+          )}
+          {canPayOnline && (
+            <div className="mt-4">
+              <PayAccount
+                storeId={store.id}
+                storeSlug={store.slug}
+                storeName={store.name}
+                accountId={account.accountId}
+                owedCents={aPagarCents}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/*
+        El detalle no vive acá. Todo el que puede abrir esta pantalla tiene ClubPay
+        —la libreta online lo requiere— y ClubPay ya muestra la pila de movimientos,
+        que es la vista agregada del deudor y es donde corresponde (P3). Repetirla
+        sería mostrarle lo mismo dos veces a la misma persona, con dos cuentas que
+        pueden no coincidir.
+      */}
+      {account.statements.length === 0 && (
+        <p className="mb-8 rounded-lg bg-neutral-100 p-4 text-sm text-neutral-600">
+          El detalle de tus compras y tus pagos con {store.name} está en ClubPay, en
+          Mis comercios.
+        </p>
       )}
 
       {/*

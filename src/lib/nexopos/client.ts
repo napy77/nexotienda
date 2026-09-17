@@ -240,6 +240,8 @@ interface AccountWire {
   onlineEnabled?: boolean;
   onlineCreditEnabled?: boolean;
   closingDay?: number;
+  dueDay?: number;
+  currentPeriod?: { from: string; to: string; dueDate?: string };
   linkedAt?: string;
   statements?: MerchantAccount['statements'];
 }
@@ -255,7 +257,10 @@ function mapAccount(w: AccountWire): MerchantAccount {
     // cuaderno. Mostrar 0 sería exactamente al revés de la verdad, y `?? null`
     // —en vez de `?? 0`— es lo que lo garantiza cuando el campo no viene.
     availableCents: w.availableCents ?? null,
+    balanceCents: w.balanceCents,
     closingDay: w.closingDay,
+    dueDay: w.dueDay,
+    currentPeriod: w.currentPeriod,
     creditPaused: w.creditPaused ?? w.paused ?? false,
     onlineCreditEnabled: w.onlineCreditEnabled ?? w.onlineEnabled ?? false,
     linkedAt: w.linkedAt,
