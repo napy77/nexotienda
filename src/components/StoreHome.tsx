@@ -2,6 +2,7 @@ import type { Campaign, Highlights, Product, Store } from '@/lib/nexopos/types';
 import { CampaignRow } from './CampaignRow';
 import { ProductShelf } from './ProductShelf';
 import { UsualShelf } from './UsualShelf';
+import { ContactButton } from './StoreShell';
 
 /**
  * La portada de la tienda.
@@ -25,12 +26,15 @@ export function StoreHome({
   highlights,
   products,
   fallback,
+  gondolas,
 }: {
   store: Store;
   campaigns: Campaign[];
   highlights: Highlights;
   products: Product[];
   fallback: Product[];
+  /** Cuántas góndolas tiene la tienda. Cero es un comercio que todavía no cargó nada. */
+  gondolas: number;
 }) {
   const porId = new Map(products.map((p) => [p.id, p]));
   const traer = (ids: string[]) =>
@@ -57,9 +61,31 @@ export function StoreHome({
 
       {vacia && <ProductShelf title="Para empezar" store={store} products={fallback} />}
 
-      <p className="mt-2 text-center text-sm text-neutral-500">
-        Buscá lo que necesitás o elegí una góndola de acá arriba.
-      </p>
+      {/*
+        Un comercio puede publicar la tienda antes de cargar el catálogo, y pasa: se
+        entusiasma, prende el switch y todavía no subió nada. Mandarlo a "elegir una
+        góndola de acá arriba" cuando arriba no hay ninguna lo deja mirando un vacío
+        sin entender si la tienda está rota o si él no terminó. Se dice cuál de las
+        dos es, y se le deja el teléfono.
+      */}
+      {gondolas === 0 && fallback.length === 0 ? (
+        <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center">
+          <p className="text-sm font-semibold text-neutral-800">
+            {store.name} todavía no cargó su catálogo
+          </p>
+          <p className="mt-1 text-sm text-neutral-500">
+            La tienda está abierta pero sin productos por ahora. Si necesitás algo,
+            preguntales directamente.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <ContactButton store={store} />
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-center text-sm text-neutral-500">
+          Buscá lo que necesitás o elegí una góndola de acá arriba.
+        </p>
+      )}
     </>
   );
 }

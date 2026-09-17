@@ -181,7 +181,7 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
 
   return (
     <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={store.bannerUrl} />}>
-      <ValueProps store={store} account={account} />
+      <ValueProps store={store} account={account} campaigns={campaigns} pasillos={pasillos} />
       <StoreBrowser
         store={store}
         pasillos={pasillos}
@@ -199,6 +199,7 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
           highlights={highlights}
           products={deEstanterias}
           fallback={muestra}
+          gondolas={pasillos.length}
         />
       </StoreBrowser>
     </StoreShell>

@@ -401,7 +401,12 @@ export const fixtures: NexoPosPort = {
     const ids = new Set(delComercio.map((p) => p.pasilloId));
     return (PASILLOS as Pasillo[])
       .filter((p) => ids.has(p.id))
-      .map((p) => conArbol(p, delComercio));
+      .map((p) => ({
+        ...conArbol(p, delComercio),
+        // Contado, no declarado: es lo que hace NexoPOS y es lo que la tienda usa
+        // para decir cuántos productos tiene. Un número inventado ahí sería (P6).
+        productCount: delComercio.filter((x) => x.pasilloId === p.id).length,
+      }));
   },
 
   async listProducts(storeId, query = {}) {

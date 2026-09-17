@@ -37,3 +37,8 @@ export function longDate(iso: string): string {
     year: 'numeric',
   }).format(toLocalDate(iso));
 }
+
+/** Un entero con separador de miles: 2847 → "2.847". */
+export function cantidad(n: number): string {
+  return new Intl.NumberFormat('es-AR').format(n);
+}
