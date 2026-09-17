@@ -29,7 +29,17 @@ function ShellBody({ store, children }: { store: Store; children: React.ReactNod
   const [cartOpen, setCartOpen] = useState(false);
   return (
     <>
-      <header className="bg-[var(--nexo-amarillo)]">
+      {/*
+        La barra no se va para arriba. No es una preferencia estética: el carrito
+        vive acá, y en una tienda se scrollea mucho —el catálogo es largo por
+        naturaleza—. Si para ver lo que llevás hay que volver hasta el principio, la
+        mitad de la gente no vuelve. Queda debajo del cajón del carrito (z-50) y
+        arriba de todo lo demás.
+
+        Solo la barra amarilla: el renglón de rubro y dirección se lee una vez y
+        despues estorba, y en un teléfono cada píxel de alto es catálogo que no se ve.
+      */}
+      <header className="sticky top-0 z-40 bg-[var(--nexo-amarillo)] shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
           <Link href={`/s/${store.slug}`} className="flex items-center gap-2">
             <StoreIcon className="h-6 w-6 text-neutral-900" />

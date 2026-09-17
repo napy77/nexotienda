@@ -79,6 +79,40 @@ export interface Product {
   availability: Availability;
 }
 
+// ---------------------------------------------------------------------------
+// Campañas
+// ---------------------------------------------------------------------------
+
+/**
+ * Una tanda de ofertas con nombre, fechas y productos: "Ofertas imperdibles", del
+ * 1 al 15, 25% en estos veinte.
+ *
+ * **El precio no se calcula acá.** La campaña dice qué productos entran y cómo se
+ * llama la sección; el `priceCents` de cada producto ya viene con el descuento
+ * aplicado por NexoPOS, y el viejo queda en `listPriceCents`. Si lo multiplicáramos
+ * nosotros, el changuito diría un número y la nota de venta otro — y de los dos el
+ * que vale es el del POS. Un número equivocado con autoridad es peor que no tener
+ * número (P6).
+ *
+ * Por eso `discountPercent` es **para el cartel**, no para la cuenta.
+ */
+export interface Campaign {
+  id: string;
+  storeId: string;
+  /** Tal cual lo escribió el comerciante. Es el título de la sección. */
+  name: string;
+  startsAt?: string;
+  endsAt?: string;
+  /** Lo que configuró el comerciante. Para mostrar; el precio ya viene con él. */
+  discountPercent: number;
+  /**
+   * Los productos de la campaña. Los que no estén en el catálogo —agotados en una
+   * tienda que esconde lo agotado— simplemente no aparecen, sin que haya que
+   * cruzar nada.
+   */
+  productIds: string[];
+}
+
 export interface Pasillo {
   id: string;
   name: string;
@@ -492,6 +526,12 @@ export interface NexoPosPort {
   listPasillos(storeId: string): Promise<Pasillo[]>;
   listProducts(storeId: string): Promise<Product[]>;
   getProduct(storeId: string, productId: string): Promise<Product | null>;
+  /**
+   * Las campañas vigentes, en el orden en que el comerciante las quiere ver.
+   * Sin campañas es `[]` y la home no muestra ninguna sección: es el caso normal
+   * de casi todo comercio, no un estado vacío que haya que dibujar.
+   */
+  listCampaigns(storeId: string): Promise<Campaign[]>;
 
   /**
    * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.

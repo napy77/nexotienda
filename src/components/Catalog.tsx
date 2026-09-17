@@ -2,17 +2,20 @@
 
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
-import type { Pasillo, Product, Store } from '@/lib/nexopos/types';
+import type { Campaign, Pasillo, Product, Store } from '@/lib/nexopos/types';
 import { ProductCard } from './ProductCard';
+import { CampaignRow } from './CampaignRow';
 
 export function Catalog({
   store,
   pasillos,
   products,
+  campaigns,
 }: {
   store: Store;
   pasillos: Pasillo[];
   products: Product[];
+  campaigns: Campaign[];
 }) {
   const [pasilloId, setPasilloId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -71,6 +74,17 @@ export function Catalog({
           </div>
         )}
       </div>
+
+      {/*
+        Las ofertas son la portada, no un acompañante de los resultados. El que
+        escribió "fideos" o tocó una góndola ya dijo qué vino a buscar; dejarle las
+        promociones arriba es hacerle scrollear por algo que descartó hace dos
+        segundos. Vuelven solas cuando limpia la búsqueda.
+      */}
+      {!query.trim() && !pasilloId &&
+        campaigns.map((c) => (
+          <CampaignRow key={c.id} store={store} campaign={c} products={products} />
+        ))}
 
       {shown.length === 0 ? (
         /*

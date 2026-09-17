@@ -32,6 +32,7 @@
  */
 import type {
   AccountEntry,
+  Campaign,
   MerchantAccount,
   NewOrder,
   NexoPosPort,
@@ -240,6 +241,27 @@ export const client: NexoPosPort = {
       `/v1/stores/${storeId}/products/${productId}`,
     );
     return w ? mapProduct(w) : null;
+  },
+
+  async listCampaigns(storeId) {
+    // Las ofertas son el adorno de la tienda, no la tienda. Si el endpoint todavía
+    // no existe —lo estamos pidiendo—, si se cae o si devuelve cualquier cosa, el
+    // comercio tiene que seguir vendiendo: se pierde la sección, no el catálogo.
+    try {
+      const cs = await catalogo<Campaign[]>(`/v1/stores/${storeId}/campaigns`);
+      if (!Array.isArray(cs)) return [];
+      const ahora = Date.now();
+      return cs.filter((c) => {
+        if (!c?.id || !c.name || !Array.isArray(c.productIds)) return false;
+        // NexoPOS manda solo las vigentes; esto es el cinturón por si una página
+        // quedó armada antes de que la campaña se venciera.
+        const fin = c.endsAt ? Date.parse(c.endsAt) : NaN;
+        return Number.isNaN(fin) || fin >= ahora;
+      });
+    } catch (e) {
+      console.error('[nexotienda] listCampaigns falló', e);
+      return [];
+    }
   },
 
   // --- pedidos: escribe, pero no llega a ninguna cuenta ---

@@ -100,16 +100,17 @@ export default async function SubdomainPage({ params }: Props) {
   }
 
   const accountId = await getAccountId(store.slug);
-  const [pasillos, products, account] = await Promise.all([
+  const [pasillos, products, campaigns, account] = await Promise.all([
     nexopos.listPasillos(store.id),
     nexopos.listProducts(store.id),
+    nexopos.listCampaigns(store.id),
     accountId ? nexopos.getAccount(store.id, accountId) : Promise.resolve(null),
   ]);
 
   return (
     <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={store.bannerUrl} />}>
       <ValueProps store={store} account={account} />
-      <Catalog store={store} pasillos={pasillos} products={products} />
+      <Catalog store={store} pasillos={pasillos} products={products} campaigns={campaigns} />
     </StoreShell>
   );
 }

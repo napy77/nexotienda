@@ -10,6 +10,7 @@ import {
   STORES_MORRISON,
 } from './fixtures.data';
 import type {
+  Campaign,
   AccountEntry,
   Availability,
   MerchantAccount,
@@ -91,6 +92,29 @@ function mapProduct(p: (typeof INITIAL_PRODUCTS)[number]): Product {
     availability: mapAvailability(p),
   };
 }
+
+/**
+ * Dos campañas, para poder ver la home con más de una sección. Los precios de estos
+ * productos ya vienen con el descuento puesto —`originalPrice` es el viejo—, que es
+ * exactamente lo que le pedimos a NexoPOS: la campaña dice quiénes entran, el precio
+ * lo aplica el POS.
+ */
+const CAMPAIGNS: Campaign[] = [
+  {
+    id: 'camp-imperdibles',
+    storeId: 'store-supersol',
+    name: 'Ofertas imperdibles',
+    discountPercent: 35,
+    productIds: ['prod-stella-x24', 'prod-nescafe-gold', 'prod-skip-3l', 'prod-stella-x6', 'prod-integra-barras', 'prod-leche-laserenisima'],
+  },
+  {
+    id: 'camp-despensa',
+    storeId: 'store-supersol',
+    name: 'Semana de despensa',
+    discountPercent: 20,
+    productIds: ['prod-yerba-playadito', 'prod-nescafe-gold', 'prod-campari'],
+  },
+];
 
 /**
  * Lo que la tienda muestra. Con el tilde apagado, lo agotado no viaja —igual que
@@ -325,6 +349,10 @@ export const fixtures: NexoPosPort = {
 
   async listProducts(storeId) {
     return visibles(storeId);
+  },
+
+  async listCampaigns(storeId) {
+    return CAMPAIGNS.filter((c) => c.storeId === storeId);
   },
 
   async getProduct(storeId, productId) {

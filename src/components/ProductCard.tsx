@@ -11,10 +11,22 @@ export function ProductCard({
   product,
   storeName,
   storeSlug,
+  offer,
 }: {
   product: Product;
   storeName: string;
   storeSlug: string;
+  /**
+   * La tarjeta va en una fila de campaña: en vez del cartelito de la esquina lleva
+   * la cinta roja cruzada sobre el zócalo de la foto.
+   *
+   * El porcentaje que se muestra sale **de los precios del producto**, no del de la
+   * campaña. Casi siempre son el mismo número; cuando no —un producto que ya venía
+   * rebajado y encima entró en la tanda— el que no miente es el de la etiqueta que
+   * está tres centímetros más abajo. El de la campaña queda de respaldo por si el
+   * POS no mandó el precio viejo.
+   */
+  offer?: { percent: number };
 }) {
   const cart = useCart();
   const qty = cart.quantityOf(product.id);
@@ -25,6 +37,8 @@ export function ProductCard({
       ? Math.round((1 - product.priceCents / product.listPriceCents) * 100)
       : null;
 
+  const cinta = offer ? (discount ?? (offer.percent > 0 ? offer.percent : null)) : null;
+
   return (
     <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-xs transition-all duration-150 hover:shadow-md">
       <div className="relative p-3">
@@ -34,7 +48,7 @@ export function ProductCard({
               {product.packTag}
             </span>
           )}
-          {discount ? (
+          {discount && !cinta ? (
             <span className="ml-auto rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
               -{discount}%
             </span>
@@ -57,8 +71,14 @@ export function ProductCard({
             <span className="text-xs text-neutral-400">Sin foto</span>
           )}
 
+          {cinta && (
+            <span className="absolute inset-x-0 bottom-0 z-10 bg-red-600 py-1 text-center text-[11px] font-extrabold tracking-wide text-white uppercase">
+              {cinta}% de descuento
+            </span>
+          )}
+
           {/* De dónde viene el dato del producto: heredado de B2B o del propio comercio (D1). */}
-          <div className="absolute bottom-1.5 left-2">
+          <div className={`absolute left-2 ${cinta ? 'bottom-7' : 'bottom-1.5'}`}>
             {product.origin === 'canonico' ? (
               <span className="inline-flex items-center gap-1 rounded border border-neutral-200 bg-white/90 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-500 backdrop-blur-xs">
                 <Barcode className="h-2.5 w-2.5" />
