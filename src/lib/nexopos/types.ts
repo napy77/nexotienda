@@ -113,6 +113,22 @@ export interface Campaign {
   productIds: string[];
 }
 
+/**
+ * Lo que el comercio vende más y lo que la gente más busca en su tienda.
+ *
+ * Son ids, no productos: el catálogo ya lo pedimos aparte y cruzarlo es gratis.
+ *
+ * **Si no están, no se inventan.** Una estantería que dice "Los más vendidos" con
+ * una selección nuestra es exactamente lo que P5 prohíbe — y en un pueblo se nota
+ * al instante, porque el almacenero sabe de memoria qué es lo que más vende. El día
+ * que no haya estadística, la estantería existe igual pero **con otro título**, uno
+ * que no afirme nada.
+ */
+export interface Highlights {
+  bestSellers: string[];
+  mostSearched: string[];
+}
+
 export interface Pasillo {
   id: string;
   name: string;
@@ -555,6 +571,11 @@ export interface NexoPosPort {
    * de casi todo comercio, no un estado vacío que haya que dibujar.
    */
   listCampaigns(storeId: string): Promise<Campaign[]>;
+  /**
+   * Lo más vendido y lo más buscado. Vacío mientras no haya estadística — que es
+   * el estado de toda tienda nueva, y no es un error.
+   */
+  listHighlights(storeId: string): Promise<Highlights>;
 
   /**
    * La cuenta de una persona EN ESTE COMERCIO. 404 si no tiene.

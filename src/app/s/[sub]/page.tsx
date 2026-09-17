@@ -1,15 +1,28 @@
 import type { Metadata } from 'next';
+import type { Pasillo, Product } from '@/lib/nexopos/types';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { BadgeCheck, MapPin, Clock } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
 import { getAccountId } from '@/lib/session';
-import { Catalog } from '@/components/Catalog';
+import { StoreBrowser } from '@/components/StoreBrowser';
+import { StoreHome } from '@/components/StoreHome';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { StoreHero } from '@/components/StoreHero';
 import { TownSearch } from '@/components/TownSearch';
 import { ValueProps } from '@/components/ValueProps';
 
-type Props = { params: Promise<{ sub: string }> };
+type Props = {
+  params: Promise<{ sub: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+/** El primero de los valores, cuando la URL trae el parámetro repetido. */
+function uno(v: string | string[] | undefined): string | undefined {
+  const x = Array.isArray(v) ? v[0] : v;
+  return x?.trim() ? x.trim() : undefined;
+}
+
+const DE_A = 60;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { sub } = await params;
@@ -36,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SubdomainPage({ params }: Props) {
+export default async function SubdomainPage({ params, searchParams }: Props) {
   const { sub } = await params;
   const resolved = await nexopos.resolveHost(sub);
   if (!resolved) notFound();
@@ -99,18 +112,107 @@ export default async function SubdomainPage({ params }: Props) {
     );
   }
 
+  const sp = await searchParams;
+  const pasilloId = uno(sp.p);
+  const subCategory = uno(sp.s);
+  const query = uno(sp.q) ?? '';
+  const limit = Math.min(Math.max(Number(uno(sp.n)) || DE_A, DE_A), 600);
+  const navegando = Boolean(pasilloId || query);
+
   const accountId = await getAccountId(store.slug);
-  const [pasillos, products, campaigns, account] = await Promise.all([
+  const [pasillos, todos, campaigns, highlights, account] = await Promise.all([
     nexopos.listPasillos(store.id),
     nexopos.listProducts(store.id),
     nexopos.listCampaigns(store.id),
+    nexopos.listHighlights(store.id),
     accountId ? nexopos.getAccount(store.id, accountId) : Promise.resolve(null),
   ]);
+
+  // Lo que se está mirando. El filtrado pasa acá, en el servidor, y al navegador
+  // baja el pedazo — no las siete mil fichas para que elija cuál pintar.
+  const q = query.toLowerCase();
+  const delPasillo = pasilloId ? todos.filter((p) => p.pasilloId === pasilloId) : [];
+  const encontrados = query
+    ? todos.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.brand ?? '').toLowerCase().includes(q) ||
+          (p.subCategory ?? '').toLowerCase().includes(q),
+      )
+    : subCategory
+      ? delPasillo.filter((p) => p.subCategory === subCategory)
+      : delPasillo;
+
+  /*
+    Los subrubros de la góndola, sacados de los productos que tiene de verdad.
+
+    El `subCategories` del pasillo es una declaración y esto es el hecho: si NexoPOS
+    manda un subrubro que no tiene ningún producto, ofrecerlo es prometer una
+    pantalla vacía; si tiene productos con un subrubro que no está declarado, no
+    ofrecerlo es esconder media góndola. Se toman los dos y se cruzan.
+  */
+  const declarados = pasillos.find((p) => p.id === pasilloId)?.subCategories ?? [];
+  const conProductos = new Set(
+    delPasillo.map((p) => p.subCategory).filter((x): x is string => Boolean(x)),
+  );
+  const subCategories = [
+    ...declarados.filter((sc) => conProductos.has(sc)),
+    ...[...conProductos].filter((sc) => !declarados.includes(sc)).sort((a, b) => a.localeCompare(b)),
+  ];
+
+  // Para la portada alcanza con lo que las estanterías nombran.
+  const deEstanterias = navegando
+    ? []
+    : (() => {
+        const ids = new Set([
+          ...campaigns.flatMap((c) => c.productIds),
+          ...highlights.bestSellers,
+          ...highlights.mostSearched,
+        ]);
+        return todos.filter((p) => ids.has(p.id));
+      })();
 
   return (
     <StoreShell store={store} bleed={<StoreHero store={store} coverUrl={store.bannerUrl} />}>
       <ValueProps store={store} account={account} />
-      <Catalog store={store} pasillos={pasillos} products={products} campaigns={campaigns} />
+      <StoreBrowser
+        store={store}
+        pasillos={pasillos}
+        pasilloId={pasilloId}
+        subCategory={subCategory}
+        subCategories={subCategories}
+        query={query}
+        products={navegando ? encontrados.slice(0, limit) : []}
+        total={encontrados.length}
+        limit={limit}
+      >
+        <StoreHome
+          store={store}
+          campaigns={campaigns}
+          highlights={highlights}
+          products={deEstanterias}
+          fallback={muestra(todos, pasillos)}
+        />
+      </StoreBrowser>
     </StoreShell>
   );
+}
+
+/**
+ * Qué mostrar en una tienda que todavía no tiene ni campañas ni estadística — que es
+ * toda tienda el día que abre.
+ *
+ * Una muestra repartida entre góndolas, para que la portada se parezca a una tienda y
+ * no a un volcado del catálogo. **No dice qué es**, y ese es el punto: no tenemos con
+ * qué llamarla "lo más vendido", así que no la llamamos así.
+ */
+function muestra(todos: Product[], pasillos: Pasillo[]): Product[] {
+  const porPasillo = new Map<string, Product[]>();
+  for (const p of todos) {
+    const lista = porPasillo.get(p.pasilloId) ?? [];
+    if (lista.length < 3) lista.push(p);
+    porPasillo.set(p.pasilloId, lista);
+  }
+  // En el orden de las góndolas del comercio, no en el de la base de datos.
+  return pasillos.flatMap((pa) => porPasillo.get(pa.id) ?? []).slice(0, 12);
 }

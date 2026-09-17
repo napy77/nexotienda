@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Banknote, BookMarked, Clock, CreditCard, Landmark, Minus, Moon, Plus, Trash2 } from 'lucide-react';
 import { money } from '@/lib/format';
 import { creditState } from '@/lib/credit';
+import { anotarComprados } from '@/lib/historial';
 import { openState, type OpenState } from '@/lib/horario';
 import { closedPolicy } from '@/lib/cerrado';
 import type { MerchantAccount, PaymentMethod, Store } from '@/lib/nexopos/types';
@@ -138,6 +139,8 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         setFalla(res.error);
         return;
       }
+      // Antes de vaciarlo: lo que se llevó hoy es lo que va a querer la próxima vez.
+      anotarComprados(store.slug, cart.lines.map((l) => l.product.id));
       cart.clear();
       router.push(res.checkoutUrl ?? `/s/${store.slug}/pedido/${res.code}`);
     });

@@ -160,3 +160,25 @@ export async function orderPulseAction(code: string): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Traer productos sueltos por id.
+ *
+ * Lo usa la estantería de "lo que solés llevar", que sabe qué ids quiere recién en
+ * el navegador —el historial vive ahí—. Se acota a lo que esa estantería puede
+ * mostrar: es un endpoint abierto y no hay razón para que sirva de volcador del
+ * catálogo.
+ */
+export async function productsByIdAction(storeId: string, ids: string[]) {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  const pedidos = new Set(ids.slice(0, 24));
+  try {
+    const todos = await nexopos.listProducts(storeId);
+    const porId = new Map(todos.map((p) => [p.id, p]));
+    // En el orden en que los pidieron: lo último comprado va primero.
+    return [...pedidos].map((id) => porId.get(id)).filter((p) => p !== undefined);
+  } catch (e) {
+    console.error('[nexotienda] productsById falló', e);
+    return [];
+  }
+}

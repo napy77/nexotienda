@@ -355,6 +355,16 @@ export const fixtures: NexoPosPort = {
     return CAMPAIGNS.filter((c) => c.storeId === storeId);
   },
 
+  async listHighlights(storeId) {
+    // Súper SOL simula tener estadística; el resto no, que es el caso de toda
+    // tienda nueva y el que hay que poder ver sin romper nada.
+    if (storeId !== 'store-supersol') return { bestSellers: [], mostSearched: [] };
+    return {
+      bestSellers: ['prod-coca-cola-225', 'prod-aceite-natura', 'prod-fernet-branca', 'prod-pan-criollo'],
+      mostSearched: ['prod-yerba-playadito', 'prod-leche-laserenisima', 'prod-shampoo-dove'],
+    };
+  },
+
   async getProduct(storeId, productId) {
     const found = products.find((p) => p.storeId === storeId && p.id === productId);
     return found?.publishedInStore ? found : null;

@@ -33,6 +33,7 @@
 import type {
   AccountEntry,
   Campaign,
+  Highlights,
   MerchantAccount,
   NewOrder,
   NexoPosPort,
@@ -241,6 +242,22 @@ export const client: NexoPosPort = {
       `/v1/stores/${storeId}/products/${productId}`,
     );
     return w ? mapProduct(w) : null;
+  },
+
+  async listHighlights(storeId) {
+    // Misma tolerancia que las campañas: son estanterías, no la tienda. Y acá hay
+    // un motivo de más — una tienda recién abierta no tiene estadística de nada, así
+    // que "vacío" es el estado normal del primer mes y no una falla que reportar.
+    try {
+      const h = await catalogo<Partial<Highlights>>(`/v1/stores/${storeId}/highlights`);
+      return {
+        bestSellers: Array.isArray(h?.bestSellers) ? h.bestSellers : [],
+        mostSearched: Array.isArray(h?.mostSearched) ? h.mostSearched : [],
+      };
+    } catch (e) {
+      console.error('[nexotienda] listHighlights falló', e);
+      return { bestSellers: [], mostSearched: [] };
+    }
   },
 
   async listCampaigns(storeId) {
