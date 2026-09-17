@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { BookMarked } from 'lucide-react';
 import { nexopos } from '@/lib/nexopos';
 import { libretaDeLaSesion } from '@/lib/libreta';
-import { money, longDate, shortDate } from '@/lib/format';
+import { money, longDate } from '@/lib/format';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { PayAccount } from '@/components/PayAccount';
 
@@ -12,6 +12,20 @@ import { PayAccount } from '@/components/PayAccount';
  * No existe una libreta "del pueblo": cada comercio es el acreedor de la suya, con su
  * propia fecha de cierre y su propio disponible (P1, D27). El total del pueblo lo
  * calcula ClubPay para mostrárselo al deudor, y nada más (P3).
+ *
+ * ---
+ *
+ * **Esta pantalla contesta dos preguntas y no más: cuánto debo y cuánto puedo
+ * cargar.** El detalle —la pila de resúmenes cerrados, los movimientos de cada uno—
+ * no está acá a propósito.
+ *
+ * La libreta online requiere ClubPay, así que **todo el que puede abrir esta pantalla
+ * ya tiene la pila en la app**. Repetirla no sería mostrar más: sería mostrarle lo
+ * mismo dos veces a la misma persona, con dos implementaciones que pueden no
+ * coincidir. Basta que difieran en qué período está abierto para que alguien vea dos
+ * deudas distintas del mismo comercio, que es lo peor que puede pasar acá (P6). Y de
+ * paso, una sesión robada en la tienda sirve para comprar —acotado, y el comerciante
+ * lo ve— y no para pasearse por la historia financiera de alguien.
  */
 export default async function LibretaPage({ params }: { params: Promise<{ sub: string }> }) {
   const { sub } = await params;
@@ -25,11 +39,11 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
         <div className="mx-auto max-w-lg rounded-xl border border-neutral-200 bg-white p-8 text-center">
           <BookMarked className="mx-auto h-8 w-8 text-neutral-300" />
           <p className="mt-3 text-sm font-semibold text-neutral-800">
-            No tenés libreta con {store.name}
+            Acá no tenés la libreta abierta
           </p>
           <p className="mt-1 text-sm text-neutral-500">
-            La libreta se abre en el mostrador, hablando con ellos y con tu documento. Después
-            la vinculás desde ClubPay y la ves acá.
+            Si ya tenés libreta con {store.name}, entrá desde ClubPay, en Mis comercios.
+            Si todavía no, se abre en el mostrador: hablando con ellos y con tu documento.
           </p>
           <p className="mt-3 text-sm text-neutral-500">
             Igual podés comprar: elegís pagar al recibirlo y listo.
@@ -42,36 +56,8 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
     );
   }
 
-  // El período abierto nunca se mezcla ni se suma con los resúmenes cerrados (D28).
-  const open = account.statements.find((st) => st.status === 'abierto');
-  const closed = account.statements.filter((st) => st.status !== 'abierto');
-  const owedCents = closed.reduce((a, st) => a + (st.totalCents - st.paidCents), 0);
-
-  /*
-    Cuánto debe, que es el número por el que entró.
-
-    **No se calcula sumando los resúmenes cerrados**: esa suma deja afuera el período
-    abierto, así que a alguien que compró ayer le diría de menos. La pila de períodos
-    sirve para *entender* la deuda, no para calcularla; el que sabe cuánto se debe es
-    el libro. Y si ese dato no viniera, no se inventa uno: no se muestra la línea.
-
-    Y el pago va por importe libre contra la cuenta, no contra un resumen elegido
-    (D31) — así que cuando hay saldo, se paga contra el saldo.
-  */
-  const debe = account.balanceCents;
-  const aPagarCents = debe ?? owedCents;
-
-  // Los movimientos no vienen anidados: se piden aparte.
-  const entriesByStatement = Object.fromEntries(
-    await Promise.all(
-      account.statements.map(async (st) => [
-        st.statementId,
-        await nexopos.getStatementEntries(store.id, account.accountId, st.statementId),
-      ]),
-    ),
-  ) as Record<string, Awaited<ReturnType<typeof nexopos.getStatementEntries>>>;
-
   const canPayOnline = store.acceptedPayments.includes('online');
+  const debe = account.balanceCents;
 
   return (
     <StoreShell store={store}>
@@ -86,25 +72,32 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
         </p>
       )}
 
-      {debe !== undefined && debe > 0 && (
+      {/*
+        Cuánto debe. Sale del saldo del libro y no de sumar resúmenes: esa suma deja
+        afuera el período abierto y a quien compró ayer le diría de menos. Si el dato
+        no viniera, no se muestra la línea — un número equivocado con autoridad es
+        peor que no tener número (P6).
+      */}
+      {debe !== undefined && (
         <div className="mb-6 rounded-xl border border-neutral-200 bg-white p-5">
           <p className="text-xs font-bold tracking-wider text-neutral-500 uppercase">
-            Le debés a {store.name}
+            {debe > 0 ? `Le debés a ${store.name}` : 'Tu cuenta está al día'}
           </p>
           <p className="mt-1 text-3xl font-black text-neutral-900">{money(debe)}</p>
-          {account.currentPeriod?.dueDate && (
+          {debe > 0 && account.currentPeriod?.dueDate && (
             <p className="mt-1 text-sm text-neutral-600">
               El período en curso vence el {longDate(account.currentPeriod.dueDate)}.
             </p>
           )}
-          {canPayOnline && (
+          {debe > 0 && canPayOnline && (
             <div className="mt-4">
+              {/* Importe libre contra la cuenta, no contra un resumen elegido (D31). */}
               <PayAccount
                 storeId={store.id}
                 storeSlug={store.slug}
                 storeName={store.name}
                 accountId={account.accountId}
-                owedCents={aPagarCents}
+                owedCents={debe}
               />
             </div>
           )}
@@ -112,23 +105,9 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
       )}
 
       {/*
-        El detalle no vive acá. Todo el que puede abrir esta pantalla tiene ClubPay
-        —la libreta online lo requiere— y ClubPay ya muestra la pila de movimientos,
-        que es la vista agregada del deudor y es donde corresponde (P3). Repetirla
-        sería mostrarle lo mismo dos veces a la misma persona, con dos cuentas que
-        pueden no coincidir.
-      */}
-      {account.statements.length === 0 && (
-        <p className="mb-8 rounded-lg bg-neutral-100 p-4 text-sm text-neutral-600">
-          El detalle de tus compras y tus pagos con {store.name} está en ClubPay, en
-          Mis comercios.
-        </p>
-      )}
-
-      {/*
         Sin límite es el default y el caso más común: ahí no se muestra ninguna línea
         de disponible. Ponerle "$0" sería exactamente al revés de la verdad, y decir
-        "sin límite" suena a premio cuando es solo cómo funciona el cuaderno.
+        "sin límite" suena a premio cuando es solo cómo funciona el cuaderno (D32).
       */}
       {account.availableCents !== null && (
         <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
@@ -155,139 +134,14 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
         </div>
       )}
 
-      {closed.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-sm font-bold tracking-wide text-neutral-500 uppercase">
-              Resúmenes cerrados
-            </h2>
-            {canPayOnline && owedCents > 0 && (
-              <PayAccount
-                storeId={store.id}
-                storeSlug={store.slug}
-                storeName={store.name}
-                accountId={account.accountId}
-                owedCents={owedCents}
-              />
-            )}
-          </div>
+      <p className="mb-8 rounded-lg bg-neutral-100 p-4 text-sm text-neutral-600">
+        El detalle de tus compras y tus pagos con {store.name} está en ClubPay, en Mis
+        comercios. Acá ves lo que necesitás para comprar.
+      </p>
 
-          <div className="space-y-3">
-            {closed.map((st) => {
-              const pending = st.totalCents - st.paidCents;
-              const entries = entriesByStatement[st.statementId] ?? [];
-              return (
-                <article
-                  key={st.statementId}
-                  className="rounded-xl border border-neutral-200 bg-white"
-                >
-                  <header className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 p-4">
-                    <div>
-                      {/* El label lo calcula NexoPOS y se muestra tal cual. */}
-                      <p className="text-sm font-bold text-neutral-900">{st.label}</p>
-                      <p className="text-xs text-neutral-500">
-                        {st.closedAt && `Cerrado el ${longDate(st.closedAt)}`}
-                        {st.dueDate && ` · vence el ${longDate(st.dueDate)}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-neutral-500">
-                        {st.status === 'pagado'
-                          ? 'Pagado'
-                          : st.paidCents > 0
-                            ? `Pagaste ${money(st.paidCents)} · queda`
-                            : 'Queda por pagar'}
-                      </p>
-                      <p className="text-lg font-black text-neutral-900">
-                        {money(st.status === 'pagado' ? st.totalCents : pending)}
-                      </p>
-                    </div>
-                  </header>
-
-                  {entries.length > 0 ? (
-                    <ul className="divide-y divide-neutral-100">
-                      {entries.map((e) => (
-                        <li key={e.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                          <span className="w-12 shrink-0 text-xs text-neutral-400">
-                            {shortDate(e.date)}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-neutral-700">
-                            {e.description}
-                            {e.receipt && (
-                              <span className="ml-1 text-xs text-neutral-400">{e.receipt}</span>
-                            )}
-                          </span>
-                          {e.disputed && (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-                              En revisión
-                            </span>
-                          )}
-                          <span className="font-medium text-neutral-900">
-                            {money(e.amountCents)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    // P5: si los movimientos no llegaron, se dice; no se muestra vacío
-                    // como si el resumen no tuviera nada.
-                    <p className="px-4 py-3 text-xs text-neutral-500">
-                      No pudimos traer el detalle de este resumen. Consultalo con{' '}
-                      {store.name}.
-                    </p>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-
-          {!canPayOnline && owedCents > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-neutral-100 p-4">
-              <p className="text-xs text-neutral-600">
-                {store.name} todavía no cobra online. Arreglalo directamente con ellos.
-              </p>
-              <ContactButton store={store} />
-            </div>
-          )}
-        </section>
-      )}
-
-      {open && (
-        <section>
-          <h2 className="mb-3 text-sm font-bold tracking-wide text-neutral-500 uppercase">
-            Lo que llevás este mes
-          </h2>
-          <article className="rounded-xl border border-dashed border-neutral-300 bg-white">
-            <header className="flex items-center justify-between border-b border-neutral-100 p-4">
-              <div>
-                <p className="text-sm font-bold text-neutral-900">{open.label}</p>
-                <p className="text-xs text-neutral-500">
-                  {account.closingDay !== undefined
-                    ? `Todavía abierto. Cierra el ${account.closingDay}.`
-                    : 'Todavía abierto.'}
-                </p>
-              </div>
-              <p className="text-lg font-black text-neutral-900">{money(open.totalCents)}</p>
-            </header>
-            <ul className="divide-y divide-neutral-100">
-              {(entriesByStatement[open.statementId] ?? []).map((e) => (
-                <li key={e.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                  <span className="w-12 shrink-0 text-xs text-neutral-400">
-                    {shortDate(e.date)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-neutral-700">
-                    {e.description}
-                    <span className="ml-1 text-xs text-neutral-400">
-                      {e.origin === 'tienda' ? 'tienda online' : 'mostrador'}
-                    </span>
-                  </span>
-                  <span className="font-medium text-neutral-900">{money(e.amountCents)}</span>
-                </li>
-              ))}
-            </ul>
-          </article>
-        </section>
-      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <ContactButton store={store} />
+      </div>
     </StoreShell>
   );
 }

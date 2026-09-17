@@ -12,7 +12,6 @@ import {
 import type {
   Campaign,
   CategoryNode,
-  AccountEntry,
   Availability,
   MerchantAccount,
   NewOrder,
@@ -302,26 +301,6 @@ const accounts: MerchantAccount[] = [
     currentPeriod: { from: '2026-09-11', to: '2026-10-10', dueDate: '2026-10-20' },
     creditPaused: false,
     onlineCreditEnabled: true,
-    statements: [
-      {
-        statementId: 'st_sol_2608',
-        // Cierra el 10, así que el período NO es un mes. El label lo calcula NexoPOS
-        // y se muestra tal cual: llamarlo "agosto" sería mentir sobre qué abarca.
-        label: '11/07 al 10/08',
-        status: 'cerrado',
-        closedAt: '2026-08-10',
-        dueDate: '2026-08-20',
-        totalCents: money(33100),
-        paidCents: 0,
-      },
-      {
-        statementId: 'st_sol_2609',
-        label: '11/08 al 10/09',
-        status: 'abierto',
-        totalCents: money(14200),
-        paidCents: 0,
-      },
-    ],
   },
   {
     accountId: 'acc_jure_7d20',
@@ -334,32 +313,11 @@ const accounts: MerchantAccount[] = [
     creditPaused: false,
     // Arranca apagado: toma la libreta solo en el mostrador (D34).
     onlineCreditEnabled: false,
-    statements: [
-      {
-        statementId: 'st_jure_2609',
-        label: '06/08 al 05/09',
-        status: 'abierto',
-        totalCents: money(9200),
-        paidCents: 0,
-      },
-    ],
   },
 ];
 
 /** Los movimientos viven aparte: NexoPOS no los anida en el listado de resúmenes. */
-const entriesByStatement: Record<string, AccountEntry[]> = {
-  st_sol_2608: [
-    { id: 'e1', date: '2026-08-02', description: 'Compra en el mostrador', amountCents: money(18400), receipt: '#1042', origin: 'mostrador' },
-    { id: 'e2', date: '2026-08-09', description: 'Compra en el mostrador', amountCents: money(14700), receipt: '#1105', origin: 'mostrador' },
-  ],
-  st_sol_2609: [
-    { id: 'e3', date: '2026-09-02', description: 'Carnicería y lácteos', amountCents: money(8400), receipt: '#1289', origin: 'mostrador' },
-    { id: 'e4', date: '2026-09-05', description: 'Despensa', amountCents: money(5800), receipt: '#1340', origin: 'tienda' },
-  ],
-  st_jure_2609: [
-    { id: 'e5', date: '2026-09-04', description: 'Corralón — bolsas de cemento', amountCents: money(9200), receipt: '#0412', origin: 'mostrador' },
-  ],
-};
+
 
 const orders = new Map<string, Order>();
 let seq = 1;
@@ -527,11 +485,6 @@ export const fixtures: NexoPosPort = {
     return accounts.find((a) => a.storeId === storeId && a.accountId === accountId) ?? null;
   },
 
-  async getStatementEntries(storeId, accountId, statementId) {
-    const account = accounts.find((a) => a.storeId === storeId && a.accountId === accountId);
-    if (!account?.statements.some((st) => st.statementId === statementId)) return [];
-    return entriesByStatement[statementId] ?? [];
-  },
 
   async createOrder(input: NewOrder) {
     const store = stores.find((s) => s.id === input.storeId);
@@ -608,22 +561,10 @@ export const fixtures: NexoPosPort = {
     const account = accounts.find((a) => a.storeId === storeId && a.accountId === accountId);
     if (!account) return null;
 
-    // Importe libre. Se imputa del resumen cerrado más viejo al más nuevo, y lo que
-    // sobra queda a cuenta del período abierto: la plata no queda colgada (D31).
-    let left = amountCents;
-    for (const st of account.statements) {
-      if (left <= 0) break;
-      if (st.status === 'abierto' || st.status === 'pagado') continue;
-      const owed = st.totalCents - st.paidCents;
-      const applied = Math.min(owed, left);
-      st.paidCents += applied;
-      st.status = st.paidCents >= st.totalCents ? 'pagado' : 'pagado_parcial';
-      left -= applied;
-    }
-    if (left > 0) {
-      const open = account.statements.find((st) => st.status === 'abierto');
-      if (open) open.paidCents += left;
-    }
+    // Importe libre contra la cuenta (D31). **La imputación no se emula acá**: cuál
+    // resumen se cancela primero lo decide NexoPOS, que es el libro. La imputación es
+    // del libro, no de la vidriera — y la vidriera ya no muestra resúmenes.
+    account.balanceCents = Math.max(0, (account.balanceCents ?? 0) - amountCents);
 
     // Pagar libera disponible en ESE comercio, que es el único acreedor (P1).
     // Si no tiene límite, no hay disponible que mover.

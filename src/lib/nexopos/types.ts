@@ -349,42 +349,22 @@ export interface Store {
 // ---------------------------------------------------------------------------
 
 /**
- * Un resumen es un período congelado (D27): un documento estable, pagable y
- * disputable. El período abierto es otra cosa y nunca se mezcla con estos (D28).
+ * **La pila de resúmenes no vive acá.**
+ *
+ * Existe —es D27 y D28: cada período se congela en un documento estable, pagable y
+ * disputable, y el abierto nunca se mezcla con los cerrados— pero la muestra ClubPay,
+ * que es la vista agregada del deudor y es donde corresponde (P3).
+ *
+ * El motivo de que no se duplique en la tienda es que **la audiencia es la misma por
+ * construcción**: la libreta online requiere ClubPay, así que todo el que puede abrir
+ * la libreta en la tienda ya tiene la pila en la app. No es mostrar menos: es no
+ * mostrarle lo mismo dos veces a la misma persona con dos cuentas que pueden no
+ * coincidir — y basta que difieran en qué período está abierto para que alguien vea
+ * dos deudas distintas del mismo comercio (P6).
+ *
+ * La tienda contesta "cuánto debo y cuánto puedo cargar", con `balanceCents` y
+ * `availableCents`. El detalle está a un toque, en la app de la que vino.
  */
-export interface AccountStatement {
-  /** NexoPOS lo llama `statement_id`: lo que la persona ve es un resumen. */
-  statementId: string;
-  /**
-   * Lo calcula NexoPOS y se muestra TAL CUAL. Si el comercio cierra el 10, el
-   * período no es ningún mes y el label es "11/08 al 10/09". Reescribirlo a nombre
-   * de mes sería mentir sobre qué abarca.
-   */
-  label: string;
-  status: 'abierto' | 'cerrado' | 'pagado_parcial' | 'pagado';
-  closedAt?: string;
-  /** Solo en los cerrados. El abierto es lo que todavía está pasando. */
-  dueDate?: string;
-  totalCents: number;
-  paidCents: number;
-  /**
-   * Los movimientos. NexoPOS todavía no los anida en el listado: se piden aparte
-   * cuando la persona abre el resumen. Sin ellos un resumen es un número y no un
-   * documento, y no se puede disputar — que es la mitad de para qué existe (D27).
-   */
-  entries?: AccountEntry[];
-}
-
-export interface AccountEntry {
-  id: string;
-  date: string;
-  description: string;
-  amountCents: number;
-  receipt?: string;
-  origin: 'mostrador' | 'tienda';
-  /** La app deja constancia de una compra desconocida; no arbitra. Eso lo hablan ellos. */
-  disputed?: boolean;
-}
 
 /**
  * La cuenta corriente de una persona CON UN COMERCIO.
@@ -482,7 +462,6 @@ export interface MerchantAccount {
   /** Ver `LinkSession.linkedAt`. Se mueve cuando el vínculo cambia, no al consultar. */
   linkedAt?: string;
   /** La pila. Del más viejo al más nuevo (D28, D30). */
-  statements: AccountStatement[];
 }
 
 /**
@@ -714,12 +693,6 @@ export interface NexoPosPort {
    * el único que sabe que el Juan del almacén y el de la ferretería son el mismo.
    */
   getAccount(storeId: string, accountId: string): Promise<MerchantAccount | null>;
-  /** Los movimientos de un resumen. Se piden cuando la persona lo abre. */
-  getStatementEntries(
-    storeId: string,
-    accountId: string,
-    statementId: string,
-  ): Promise<AccountEntry[]>;
 
   createOrder(order: NewOrder): Promise<Order>;
   getOrder(code: string): Promise<Order | null>;

@@ -31,7 +31,6 @@
  * calcen con el cable.
  */
 import type {
-  AccountEntry,
   Campaign,
   CategoryNode,
   Highlights,
@@ -243,7 +242,6 @@ interface AccountWire {
   dueDay?: number;
   currentPeriod?: { from: string; to: string; dueDate?: string };
   linkedAt?: string;
-  statements?: MerchantAccount['statements'];
 }
 
 function mapAccount(w: AccountWire): MerchantAccount {
@@ -264,7 +262,6 @@ function mapAccount(w: AccountWire): MerchantAccount {
     creditPaused: w.creditPaused ?? w.paused ?? false,
     onlineCreditEnabled: w.onlineCreditEnabled ?? w.onlineEnabled ?? false,
     linkedAt: w.linkedAt,
-    statements: w.statements ?? [],
   };
 }
 
@@ -428,10 +425,6 @@ export const client: NexoPosPort = {
     return w?.accountId ? mapAccount(w) : null;
   },
 
-  getStatementEntries: (storeId, accountId, statementId) =>
-    cuentas<AccountEntry[]>(
-      `/v1/stores/${storeId}/accounts/${accountId}/statements/${statementId}/entries`,
-    ),
 
   registerAccountPayment: (input) =>
     cuentas<MerchantAccount | null>(

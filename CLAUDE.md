@@ -100,6 +100,14 @@ su motivo** — no se esconde: esconderla no le enseña a nadie que existe.
   el período no es un mes y se llama "11/08 al 10/09".
 - No hay "una deuda": hay una **pila de períodos** (D28). El período abierto **nunca**
   se mezcla ni se suma con los resúmenes cerrados.
+- **La pila la muestra ClubPay, no la tienda.** La libreta online requiere ClubPay, así
+  que todo el que puede abrirla en la tienda ya tiene la pila en la app: repetirla
+  sería mostrarle lo mismo dos veces a la misma persona, con dos implementaciones que
+  pueden no coincidir — y basta que difieran en qué período está abierto para que
+  alguien vea dos deudas distintas del mismo comercio (P6). La tienda contesta
+  **cuánto debo y cuánto puedo cargar**, con `balanceCents` y `availableCents`.
+- **Cuánto se debe sale del saldo, nunca de sumar resúmenes.** Esa suma deja afuera el
+  período abierto y a quien compró ayer le dice de menos.
 - La ficha del cliente muestra **antigüedad, no un total** (D30).
 - El pago va **por importe libre contra la cuenta**, no contra un resumen elegido:
   NexoPOS lo imputa del más viejo al más nuevo (D31). La imputación es del libro, no
