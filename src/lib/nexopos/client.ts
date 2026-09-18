@@ -385,7 +385,20 @@ export const client: NexoPosPort = {
         body: JSON.stringify({ storeId, clientHint }),
       });
       const requestId = r?.requestId ?? r?.request_id;
-      if (!requestId || !r?.code) return null;
+      if (!requestId || !r?.code) {
+        /*
+          Un 404 se traduce a `null` más arriba, y eso es correcto para un recurso que
+          no está — pero para un endpoint que **todavía no existe** convierte la falla
+          en silencio: la pantalla degrada bien y no queda rastro de por qué. Que esta
+          línea esté es la diferencia entre mirar un log y adivinar.
+        */
+        console.error(
+          '[nexotienda] /v1/cuentas/emparejar no devolvió un pedido válido. ' +
+            '¿Está construido del lado de NexoPOS y encadenado contra ClubPay?',
+          r,
+        );
+        return null;
+      }
       return { requestId, code: r.code, expiresAt: r.expiresAt ?? r.expires_at ?? '' };
     } catch (e) {
       // Que no exista todavía no es un error que mostrar: la pantalla ofrece el
@@ -400,7 +413,16 @@ export const client: NexoPosPort = {
       const r = await cuentas<PairingStatus>(
         `/v1/cuentas/emparejar/${encodeURIComponent(requestId)}?storeId=${encodeURIComponent(storeId)}`,
       );
-      return r?.status === 'listo' || r?.status === 'vencido' ? r : { status: 'pendiente' };
+      if (!r?.status) {
+        // Mismo caso que arriba: sin esto, un endpoint inexistente se ve igual que
+        // una persona que todavía no confirmó, y la pantalla espera para siempre.
+        console.error(
+          '[nexotienda] /v1/cuentas/emparejar/:id no devolvió estado. ' +
+            '¿Está construido del lado de NexoPOS?',
+        );
+        return { status: 'vencido' };
+      }
+      return r.status === 'listo' || r.status === 'vencido' ? r : { status: 'pendiente' };
     } catch (e) {
       // Un error de red en un sondeo no es que se venció: se vuelve a preguntar.
       console.error('[nexotienda] fallo al consultar el emparejamiento', e);
