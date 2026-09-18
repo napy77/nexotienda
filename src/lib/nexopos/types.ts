@@ -103,7 +103,18 @@ export interface Campaign {
   name: string;
   startsAt?: string;
   endsAt?: string;
-  /** Lo que configuró el comerciante. Para mostrar; el precio ya viene con él. */
+  /**
+   * **El descuento más alto de la tanda, no "el descuento".**
+   *
+   * Cada producto lleva el suyo —al arroz se le hace 30 y al aceite 12, porque el
+   * margen de cada uno es distinto— así que un número solo miente salvo que se lea
+   * como *"hasta 41%"*. Se muestra en el título de la sección con esa palabra
+   * adelante, y **en ninguna otra parte**.
+   *
+   * En particular no sirve de respaldo para la cinta de un producto: si ese producto
+   * no trae `listPriceCents` es que no tiene descuento, y ponerle el techo de la
+   * campaña sería inventarle una rebaja que no tiene (P6).
+   */
   discountPercent: number;
   /**
    * Los productos de la campaña. Los que no estén en el catálogo —agotados en una

@@ -20,13 +20,13 @@ export function ProductCard({
    * La tarjeta va en una fila de campaña: en vez del cartelito de la esquina lleva
    * la cinta roja cruzada sobre el zócalo de la foto.
    *
-   * El porcentaje que se muestra sale **de los precios del producto**, no del de la
-   * campaña. Casi siempre son el mismo número; cuando no —un producto que ya venía
-   * rebajado y encima entró en la tanda— el que no miente es el de la etiqueta que
-   * está tres centímetros más abajo. El de la campaña queda de respaldo por si el
-   * POS no mandó el precio viejo.
+   * **Es un interruptor, no un número.** El porcentaje sale siempre de los precios de
+   * este producto: cada uno de la tanda tiene el suyo —al arroz se le hace 30 y al
+   * aceite 12— así que el de la campaña es un techo y no le corresponde a nadie en
+   * particular. Y si este producto no trae precio viejo, es que no tiene descuento:
+   * va sin cinta, en vez de heredarle el techo de la tanda.
    */
-  offer?: { percent: number };
+  offer?: boolean;
 }) {
   const cart = useCart();
   const qty = cart.quantityOf(product.id);
@@ -37,7 +37,7 @@ export function ProductCard({
       ? Math.round((1 - product.priceCents / product.listPriceCents) * 100)
       : null;
 
-  const cinta = offer ? (discount ?? (offer.percent > 0 ? offer.percent : null)) : null;
+  const cinta = offer ? discount : null;
 
   return (
     <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-xs transition-all duration-150 hover:shadow-md">

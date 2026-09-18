@@ -21,13 +21,20 @@ export function ProductShelf({
   store,
   products,
   offer,
+  hasta,
   href,
   hrefLabel = 'Ver todas',
 }: {
   title: string;
   store: Store;
   products: Product[];
-  offer?: { percent: number };
+  /** Las tarjetas van con cinta en vez del cartelito de la esquina. */
+  offer?: boolean;
+  /**
+   * El descuento más alto de la tanda. Se muestra **con "hasta" adelante**, que es lo
+   * único que lo hace verdadero: cada producto tiene el suyo y este es el techo.
+   */
+  hasta?: number;
   href?: string;
   hrefLabel?: string;
 }) {
@@ -37,6 +44,11 @@ export function ProductShelf({
     <section className="mb-8">
       <div className="mb-3 flex items-baseline gap-3">
         <h2 className="text-lg font-black tracking-tight text-neutral-900">{title}</h2>
+        {hasta !== undefined && hasta > 0 && (
+          <span className="rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-extrabold text-white">
+            hasta {Math.round(hasta)}%
+          </span>
+        )}
         {href && (
           <Link
             href={href}

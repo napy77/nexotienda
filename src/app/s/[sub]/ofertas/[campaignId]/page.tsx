@@ -57,9 +57,11 @@ export default async function OfertasPage({ params }: Props) {
       <h1 className="text-2xl font-black tracking-tight text-neutral-900">{campaign.name}</h1>
       <p className="mt-1 mb-5 text-sm text-neutral-500">
         {enOferta.length} {enOferta.length === 1 ? 'producto' : 'productos'} en {store.name}
+        {/* "Hasta", porque cada producto de la tanda tiene su propio descuento. */}
+        {campaign.discountPercent > 0 && `, con descuentos de hasta ${Math.round(campaign.discountPercent)}%`}
       </p>
 
-      <OfferGrid store={store} products={enOferta} percent={campaign.discountPercent} />
+      <OfferGrid store={store} products={enOferta} />
     </StoreShell>
   );
 }

@@ -147,25 +147,32 @@ function conArbol(p: Pasillo, delComercio: Product[]): Pasillo {
 }
 
 /**
- * Dos campañas, para poder ver la home con más de una sección. Los precios de estos
- * productos ya vienen con el descuento puesto —`originalPrice` es el viejo—, que es
- * exactamente lo que le pedimos a NexoPOS: la campaña dice quiénes entran, el precio
- * lo aplica el POS.
+ * Dos campañas, para poder ver la home con más de una sección.
+ *
+ * Los precios ya vienen con el descuento puesto —`originalPrice` es el viejo— y
+ * **cada producto tiene el suyo**: en la de despensa hay 13%, 19% y uno sin rebaja.
+ * El `discountPercent` de la campaña es **el más alto de la tanda**, que es lo que
+ * NexoPOS manda ahora, y por eso en pantalla se lee "hasta".
+ *
+ * El Fernet está a propósito en una campaña sin precio viejo: es el caso que hay que
+ * poder mirar, porque la tarjeta tiene que salir **sin cinta** en vez de heredarle el
+ * techo de la tanda.
  */
 const CAMPAIGNS: Campaign[] = [
   {
     id: 'camp-imperdibles',
     storeId: 'store-supersol',
     name: 'Ofertas imperdibles',
-    discountPercent: 35,
+    discountPercent: 20,
     productIds: ['prod-stella-x24', 'prod-nescafe-gold', 'prod-skip-3l', 'prod-stella-x6', 'prod-integra-barras', 'prod-leche-laserenisima'],
   },
   {
     id: 'camp-despensa',
     storeId: 'store-supersol',
     name: 'Semana de despensa',
-    discountPercent: 20,
-    productIds: ['prod-yerba-playadito', 'prod-nescafe-gold', 'prod-campari'],
+    discountPercent: 19,
+    // En el orden que lo arrastró el comerciante, no por id ni por nombre.
+    productIds: ['prod-campari', 'prod-fernet-branca', 'prod-yerba-playadito', 'prod-nescafe-gold'],
   },
 ];
 

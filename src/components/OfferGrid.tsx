@@ -3,15 +3,17 @@
 import type { Product, Store } from '@/lib/nexopos/types';
 import { ProductCard } from './ProductCard';
 
-/** La grilla de una campaña. Cliente porque las tarjetas tocan el carrito. */
+/**
+ * La grilla de una campaña. Cliente porque las tarjetas tocan el carrito.
+ *
+ * En el orden que llegan, que es el que el comerciante arrastró. No se reordena.
+ */
 export function OfferGrid({
   store,
   products,
-  percent,
 }: {
   store: Store;
   products: Product[];
-  percent: number;
 }) {
   if (products.length === 0) {
     return (
@@ -34,7 +36,7 @@ export function OfferGrid({
           product={p}
           storeName={store.name}
           storeSlug={store.slug}
-          offer={{ percent }}
+          offer
         />
       ))}
     </div>
