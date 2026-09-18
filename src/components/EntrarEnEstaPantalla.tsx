@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Monitor, Loader2 } from 'lucide-react';
 import type { Store } from '@/lib/nexopos/types';
@@ -46,6 +46,17 @@ type Estado =
 export function EntrarEnEstaPantalla({ store }: { store: Store }) {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>({ k: 'inicio' });
+  /*
+    ClubPay entrega el token **una sola vez**: el segundo `GET` sobre el mismo pedido
+    contesta "vencido", para que dos procesos preguntando no se lleven dos sesiones.
+    Preguntar cada tres segundos está bien; lo que no puede es que haya dos preguntas
+    en vuelo a la vez.
+
+    Sin esto, una consulta lenta y la siguiente del intervalo se pisan: una se lleva el
+    token y abre la libreta, la otra recibe "vencido" y la pantalla muestra que venció
+    justo cuando acababa de funcionar.
+  */
+  const enVuelo = useRef(false);
 
   async function empezar() {
     setEstado({ k: 'abriendo' });
@@ -79,7 +90,14 @@ export function EntrarEnEstaPantalla({ store }: { store: Store }) {
         setEstado({ k: 'vencido' });
         return;
       }
-      const r = await consultarEmparejamientoAction(store.id, store.slug);
+      if (enVuelo.current) return;
+      enVuelo.current = true;
+      let r: Awaited<ReturnType<typeof consultarEmparejamientoAction>>;
+      try {
+        r = await consultarEmparejamientoAction(store.id, store.slug);
+      } finally {
+        enVuelo.current = false;
+      }
       if (!vivo || r === 'pendiente') return;
       clearInterval(t);
       if (r === 'listo') router.refresh();
