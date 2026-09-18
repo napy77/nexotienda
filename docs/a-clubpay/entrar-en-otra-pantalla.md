@@ -43,42 +43,12 @@ código, en el de NexoPOS y en los dos pedidos que **no es prueba de nada**: sir
 caso honesto y como color. La defensa es el nombre del comercio, que ustedes deducen de
 la clave, y la pregunta.
 
-## La URL: sacando el `/s/`
+## Las URLs y el slug
 
-Su plantilla es `https://{slug}.nexotienda.app/s/{slug}/libreta`, con el slug dos veces.
-La correcta es:
-
-```
-https://{slug}.nexotienda.app/libreta
-```
-
-El `/s/{slug}` **es una reescritura interna nuestra**: un proxy toma el subdominio y lo
-convierte en esa ruta. Nunca debió salir de acá, y que ustedes la hayan visto es un
-problema de documentación nuestro. Funciona igual si la mandan, pero es una convención
-interna que puede cambiar sin avisarles.
-
-Lo mismo para la tienda: `https://{slug}.nexotienda.app`, y nada más.
-
-## El slug: tienen razón y el ejemplo malo era nuestro
-
-**Nosotros escribimos `jure` en los documentos.** Es el valor de nuestros datos de
-prueba, y lo usamos como si fuera real. El de verdad es `jure-hnos-srl`. Ese 404 lo
-pagaron ustedes por un ejemplo nuestro escrito sin verificar.
-
-Y sí: **el slug tiene que llegarles como un dato**, en la ficha del comercio junto al
-nombre y la dirección. Nunca deducido del nombre — lo elige el comerciante y no hay
-ninguna regla que lo derive.
-
-Van los dos campos que ya les habíamos pedido, ahora con más motivo:
-
-| Campo | Qué es |
-|---|---|
-| `storefrontSlug` | `"jure-hnos-srl"`. La URL es `https://<slug>.nexotienda.app` |
-| `storefrontPublished` | Si la tienda está publicada. **No todo comercio tiene tienda** |
-
-Y el regalo de siempre: pueden cachearlo sin miedo. Si el comerciante lo cambia, el
-viejo sigue redirigiendo para siempre — acá los links viajan por WhatsApp y no se
-pueden dejar morir.
+Están en **[libreta.md](libreta.md), sección 3**, que es donde se piden el botón y los
+campos de la ficha. Van ahí y no acá para que haya **una sola versión escrita**: el
+enredo del `/s/{slug}` salió justamente de que la misma respuesta estaba en dos
+documentos distintos.
 
 ## El circuito, para que quede uno solo escrito
 
@@ -97,6 +67,8 @@ pasan derecho sin NexoPOS en el medio.
 
 ## Lo que sigue esperando
 
-1. `storefrontSlug` y `storefrontPublished` en la ficha del comercio.
-2. "Ir a la tienda" en Mis comercios — apuntando a `https://<slug>.nexotienda.app`.
-3. "Entrar en otra pantalla" con el campo para el código.
+De este documento, uno solo: **"Entrar en otra pantalla"** con el campo para el código
+y el endpoint de emparejar.
+
+Lo demás —el slug en la ficha y el botón "Ir a la tienda"— está en
+[libreta.md](libreta.md), que es donde vive.

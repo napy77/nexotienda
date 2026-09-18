@@ -23,14 +23,35 @@ import { sessionCookieName, sessionCookieOptions, sessionCookieValue } from '@/l
  *   contra la clave de *ese* comercio en ClubPay — un token de Jure canjeado como
  *   Delfín no valida. La comparación que queda acá abajo ya no es esa comprobación:
  *   es el cinturón que atrapa una respuesta incoherente de NexoPOS, no un ataque.
- * - **Nunca se redirige a una URL que venga de afuera.** Siempre a la raíz de este
- *   mismo host, que además es lo que conserva el carrito: otro host es otro origen y
- *   otro `localStorage`.
+ * - **Nunca se redirige a una URL que venga de afuera.** El parámetro `ir` no es una
+ *   URL: es una llave de una lista fija de acá abajo. Aceptar una URL sería un
+ *   redirector abierto con la marca de la tienda —`jure.nexotienda.app/entrar?ir=…`
+ *   mandando a cualquier lado— que es exactamente lo que hace creíble una estafa.
+ *   Y siempre al mismo host, que además es lo que conserva el carrito: otro host es
+ *   otro origen y otro `localStorage`.
  */
+
+/**
+ * A dónde cae la persona después de entrar.
+ *
+ * ClubPay tiene dos botones distintos: "Ir a la tienda", que va a comprar, y "Ver tu
+ * cuenta y tus movimientos", que va a la libreta. Los dos canjean el mismo token; lo
+ * único que cambia es dónde termina.
+ *
+ * Es una lista fija a propósito. Ver arriba.
+ */
+const DESTINOS: Record<string, string> = {
+  tienda: '/',
+  libreta: '/libreta',
+};
 export async function GET(request: NextRequest, ctx: { params: Promise<{ sub: string }> }) {
   const { sub } = await ctx.params;
   const host = request.headers.get('host') ?? request.nextUrl.host;
   const raiz = new URL(`${request.nextUrl.protocol}//${host}/`);
+  // Ausente o desconocido cae en la tienda, que es el destino que siempre sirve.
+  const destino = new URL(
+    `${request.nextUrl.protocol}//${host}${DESTINOS[request.nextUrl.searchParams.get('ir') ?? ''] ?? '/'}`,
+  );
 
   function irA(url: URL) {
     const res = NextResponse.redirect(url);
@@ -55,7 +76,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ sub: st
     return irA(falla);
   }
 
-  const res = irA(raiz);
+  const res = irA(destino);
   res.cookies.set(
     sessionCookieName(sub),
     sessionCookieValue({

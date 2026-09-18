@@ -152,6 +152,11 @@ su motivo** — no se esconde: esconderla no le enseña a nadie que existe.
 - **La URL pública de una tienda es `https://<slug>.nexotienda.app`.** El `/s/<sub>` es
   la reescritura interna de `proxy.ts` y no sale de este repo. Y el slug **es un dato
   que viaja**, nunca se deduce del nombre: lo elige el comerciante.
+- **Todo lo que venga de ClubPay entra por `/entrar?t=<token>`**, con `&ir=libreta`
+  cuando el botón es "ver tu cuenta". Mandar a alguien directo a `/libreta` sin token
+  lo deja en "acá no tenés la libreta abierta", que es peor que un 404: parece que le
+  sacaron algo. **`ir` es una llave de una lista fija, nunca una URL** — aceptar una
+  URL sería un redirector abierto con la marca de la tienda.
 - **Nunca** datos personales en query string.
 - El pago usa el Mercado Pago del propio comercio (modelo marketplace, split).
 - **Degradación sin Mercado Pago**: la cuenta corriente sigue funcionando; solo se pierde

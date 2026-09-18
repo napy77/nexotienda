@@ -65,30 +65,62 @@ pedíamos como campo nuevo ya lo hacía su propio diseño.
 
 No agreguen nada. Un campo que nadie lee envejece peor que no tenerlo.
 
-## 3. La URL de la tienda: no hay patrón, y no conviene que lo inventen
+## 3. Las URLs, sin ambigüedad
 
-Preguntaron si pueden armarla solos con algún dato que ya tengan. **No.**
+En un documento anterior escribimos "la URL correcta es
+`https://{slug}.nexotienda.app/libreta`" mientras corregíamos el `/s/{slug}` duplicado
+de su plantilla, **sin decir para qué botón era**. Fue nuestra culpa que quedara
+sonando como *la* URL. Son dos, y hay una tercera que no existe:
 
-El slug lo **elige el comerciante** y vive en NexoPOS. "Jure Hnos SRL" es `jure`, no
-`jure-hnos-srl` ni `jurehnossrl`. Cualquier patrón adivinado da un 404, y un 404 en el
-único botón que lleva a la tienda es peor que no tener el botón.
+| Botón en Mis comercios | URL |
+|---|---|
+| **Ir a la tienda** | `https://<slug>.nexotienda.app/entrar?t=<token>` |
+| **Ver tu cuenta y tus movimientos** | `https://<slug>.nexotienda.app/entrar?t=<token>&ir=libreta` |
 
-Necesitan dos campos en la ficha del comercio, donde ya viven el nombre y la
-dirección:
+**Los dos pasan por `/entrar` y los dos llevan token.** Lo único que cambia es `ir`,
+que dice dónde cae la persona después del canje. Sin `ir`, cae en la tienda.
+
+Y la tercera, la que **no** hay que usar:
+
+```
+https://<slug>.nexotienda.app/libreta        ← sin token
+```
+
+Esa es una URL real y carga, pero **carga sin sesión**: alguien que sí tiene libreta
+vería "acá no tenés la libreta abierta". Peor que un 404, porque parece que le sacaron
+algo.
+
+Dos detalles:
+
+- **`ir` no es una URL, es una llave.** Solo `tienda` y `libreta`; cualquier otra cosa
+  cae en la tienda. Es a propósito: aceptar una URL convertiría
+  `jure.nexotienda.app/entrar?ir=…` en un redirector abierto con la marca de la tienda,
+  que es justo lo que hace creíble una estafa.
+- **El `/s/<slug>` de su plantilla vieja no va.** Es una reescritura interna nuestra —un
+  proxy toma el subdominio y arma esa ruta— que nunca debió salir de nuestro repo.
+  Funciona si la mandan, pero puede cambiar sin avisarles.
+
+## 3b. El slug es un dato, no una conjetura
+
+**El ejemplo malo era nuestro.** Escribimos `jure` en los documentos: es el valor de
+nuestros datos de prueba y lo usamos como si fuera real. El de verdad es
+`jure-hnos-srl`. Ese 404 lo pagaron ustedes por un ejemplo nuestro escrito sin
+verificar.
+
+El slug lo **elige el comerciante** y no hay ninguna regla que lo derive del nombre.
+Necesitan dos campos en la ficha, donde ya viven el nombre y la dirección:
 
 | Campo | Qué es |
 |---|---|
-| `storefrontSlug` | `"jure"`. La URL es `https://<slug>.nexotienda.app` |
+| `storefrontSlug` | `"jure-hnos-srl"`. La URL es `https://<slug>.nexotienda.app` |
 | `storefrontPublished` | Si la tienda está publicada |
 
-**Y la respuesta a su otra pregunta es no: no todo comercio tiene tienda.** Hay
-comercios que usan NexoPOS y no venden online, y es una decisión del comerciante. El
-botón aparece solo con `storefrontPublished: true`.
+**Y no: no todo comercio tiene tienda.** Hay comercios que usan NexoPOS y no venden
+online. El botón aparece solo con `storefrontPublished: true`.
 
-**Un regalo del diseño: pueden cachear el slug sin miedo.** Si el comerciante lo
-cambia, el viejo sigue redirigiendo para siempre, porque acá los links viajan por
-WhatsApp y no se pueden dejar morir. Un slug desactualizado en ClubPay llega igual a
-la tienda correcta.
+**Pueden cachear el slug sin miedo.** Si el comerciante lo cambia, el viejo sigue
+redirigiendo para siempre — acá los links viajan por WhatsApp y no se pueden dejar
+morir.
 
 ## 4. Sobre la vuelta a la app: de acuerdo, no la fuercen
 
