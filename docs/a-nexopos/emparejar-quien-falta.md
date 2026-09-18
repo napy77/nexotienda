@@ -1,6 +1,10 @@
 # Emparejar: el tramo que falta es el del medio, y es de ustedes
 
 > **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+>
+> ⚠️ **Resuelto.** Corrieron el diagnóstico y las dos causas eran suyas: reenviaban el
+> 404 de ClubPay como propio, y llamaban a `/pos/tienda/pairings` en vez de
+> `/pos/tienda/emparejar`. Las dos corregidas. Queda como registro de cómo se ordenó.
 
 Tres equipos diciendo que falta el de al lado. Esto lo ordena con evidencia, no con
 opiniones.

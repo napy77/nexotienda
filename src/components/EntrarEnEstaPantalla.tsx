@@ -39,7 +39,7 @@ import {
 type Estado =
   | { k: 'inicio' }
   | { k: 'abriendo' }
-  | { k: 'esperando'; code: string }
+  | { k: 'esperando'; code: string; hasta: number }
   | { k: 'vencido' }
   | { k: 'sin_soporte' };
 
@@ -50,13 +50,35 @@ export function EntrarEnEstaPantalla({ store }: { store: Store }) {
   async function empezar() {
     setEstado({ k: 'abriendo' });
     const par = await abrirEmparejamientoAction(store.id, store.slug);
-    setEstado(par ? { k: 'esperando', code: par.code } : { k: 'sin_soporte' });
+    if (!par) {
+      setEstado({ k: 'sin_soporte' });
+      return;
+    }
+    // Si la fecha no viene o no se entiende, cinco minutos, que es lo acordado.
+    const hasta = Date.parse(par.expiresAt ?? '') || Date.now() + 5 * 60_000;
+    setEstado({ k: 'esperando', code: par.code, hasta });
   }
 
   useEffect(() => {
     if (estado.k !== 'esperando') return;
+    const hasta = estado.hasta;
     let vivo = true;
     const t = setInterval(async () => {
+      /*
+        **El sondeo tiene que terminar.** Antes no terminaba nunca: si la persona se
+        iba del escritorio, o si el salto de atrás fallaba —un error de red o un 502
+        vuelven como "pendiente", que es lo mismo que "todavía no confirmó"— la
+        pantalla giraba para siempre. Es el mismo error que NexoPOS corrigió del otro
+        lado: un problema de atrás presentado como "todo bien, seguí esperando".
+
+        El código vence igual a los cinco minutos, así que el reloj es el límite que
+        ya existía y nadie estaba mirando.
+      */
+      if (Date.now() > hasta) {
+        clearInterval(t);
+        setEstado({ k: 'vencido' });
+        return;
+      }
       const r = await consultarEmparejamientoAction(store.id, store.slug);
       if (!vivo || r === 'pendiente') return;
       clearInterval(t);
@@ -91,7 +113,7 @@ export function EntrarEnEstaPantalla({ store }: { store: Store }) {
         </p>
         <p className="flex items-center justify-center gap-2 text-xs text-neutral-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Esperando que lo confirmes en el teléfono. El código dura tres minutos.
+          Esperando que lo confirmes en el teléfono. El código dura cinco minutos.
         </p>
       </div>
     );
