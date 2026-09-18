@@ -35,6 +35,8 @@ import type {
   CategoryNode,
   Highlights,
   LinkSession,
+  Pairing,
+  PairingStatus,
   MerchantAccount,
   NewOrder,
   NexoPosPort,
@@ -370,18 +372,39 @@ export const client: NexoPosPort = {
     }
   },
 
-  async redeemPairingCode(storeId, code) {
+  async openPairing(storeId, clientHint) {
     try {
-      const r = await cuentas<{ token?: string } | null>('/v1/cuentas/emparejar/canjear', {
+      // ClubPay nombra los campos en snake_case y NexoPOS traduce. Se aceptan las dos
+      // formas: si alguna vez pasan derecho, no se cae la pantalla por un guion bajo.
+      type Wire = Partial<Pairing> & {
+        request_id?: string;
+        expires_at?: string;
+      };
+      const r = await cuentas<Wire | null>('/v1/cuentas/emparejar', {
         method: 'POST',
-        body: JSON.stringify({ storeId, code: code.trim().toUpperCase() }),
+        body: JSON.stringify({ storeId, clientHint }),
       });
-      return r?.token ?? null;
+      const requestId = r?.requestId ?? r?.request_id;
+      if (!requestId || !r?.code) return null;
+      return { requestId, code: r.code, expiresAt: r.expiresAt ?? r.expires_at ?? '' };
     } catch (e) {
-      // Un código mal tipeado es un 4xx y es el caso normal: cinco caracteres se
-      // erran. No es una falla que gritar, es "fijate el código".
-      console.error('[nexotienda] canje de código falló', e);
+      // Que no exista todavía no es un error que mostrar: la pantalla ofrece el
+      // camino por el teléfono, que siempre funciona.
+      console.error('[nexotienda] no se pudo abrir el emparejamiento', e);
       return null;
+    }
+  },
+
+  async pollPairing(storeId, requestId) {
+    try {
+      const r = await cuentas<PairingStatus>(
+        `/v1/cuentas/emparejar/${encodeURIComponent(requestId)}?storeId=${encodeURIComponent(storeId)}`,
+      );
+      return r?.status === 'listo' || r?.status === 'vencido' ? r : { status: 'pendiente' };
+    } catch (e) {
+      // Un error de red en un sondeo no es que se venció: se vuelve a preguntar.
+      console.error('[nexotienda] fallo al consultar el emparejamiento', e);
+      return { status: 'pendiente' };
     }
   },
 

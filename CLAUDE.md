@@ -142,6 +142,16 @@ su motivo** — no se esconde: esconderla no le enseña a nadie que existe.
   no por comercio: NexoTienda es un solo servidor que renderiza cualquier tienda, no
   un cliente de un comercio. La de `cuentas` **sola no alcanza**: esos endpoints
   piden además la sesión del token. La clave dice *qué endpoint*, el token *de quién*.
+- **Para abrir la libreta en otra pantalla, el código nace en la computadora** y se
+  tipea en la app, nunca al revés. Al revés sería un OTP, y los OTP se roban por
+  teléfono: la diferencia que decide es **dónde puede intervenir el defensor**. Así, el
+  ataque pasa por una pantalla de ClubPay que nombra el comercio y pregunta; invertido,
+  en el momento en que alguien dicta el código la app no participa. El `clientHint` que
+  mandamos **no es prueba de nada** —lo escribe quien abre el pedido— y sirve solo en
+  el caso honesto.
+- **La URL pública de una tienda es `https://<slug>.nexotienda.app`.** El `/s/<sub>` es
+  la reescritura interna de `proxy.ts` y no sale de este repo. Y el slug **es un dato
+  que viaja**, nunca se deduce del nombre: lo elige el comerciante.
 - **Nunca** datos personales en query string.
 - El pago usa el Mercado Pago del propio comercio (modelo marketplace, split).
 - **Degradación sin Mercado Pago**: la cuenta corriente sigue funcionando; solo se pierde

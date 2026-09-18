@@ -2,99 +2,101 @@
 
 > **Para el equipo de ClubPay.** Este archivo se manda tal cual.
 >
-> *Reemplaza a la versión anterior, que tenía el código naciendo en la computadora. Si
-> ya empezaron con esa, paren: la dirección se invirtió y quedó más simple.*
+> *Reemplaza a las dos versiones anteriores. La dirección vuelve a ser la del primer
+> documento: el código nace en la computadora. Ustedes tenían razón.*
 
-El caso: **la tienda abierta en la computadora de casa y ClubPay en el celular.** El
-handoff que armamos no sirve ahí —abre la tienda *en el teléfono*— y la computadora no
-tiene forma de demostrar quién es.
+## Tenían razón, y el error fue nuestro
 
-Hoy, en esa situación, la libreta no se puede usar.
+Dieron vuelta la dirección en la implementación, se las pedimos de vuelta, y ahora la
+revertimos a la que ustedes defienden. Vale la pena decir **por qué nos equivocamos**,
+porque el razonamiento equivocado puede volver:
 
----
+NexoPOS nos mostró que la descripción del dispositivo no era una defensa —en ese
+ataque el que abre el pedido es el atacante, así que esa cadena la escribe él—. De ahí
+concluimos que la dirección estaba mal. **La conclusión correcta era más chica:** lo que
+defiende no es el `client_hint`, es **la pantalla de confirmación**. Y esta dirección es
+la única que tiene una.
 
-## El circuito
+Su argumento decisivo es el que no habíamos visto: **dónde puede intervenir el
+defensor.** Así, el ataque pasa por una pantalla de ustedes, que puede nombrar el
+comercio y preguntar. Invertido, en el momento en que alguien dicta el código la app no
+participa: no hay pantalla donde poner nada.
 
-```
-1. En el teléfono    ClubPay → Mis comercios → Jure Hnos SRL
-                     → "Entrar en otra pantalla"
-                     → la app muestra:  VRCCX
+Y la observación de que nuestro propio aviso —*"si alguien te lo pide, no se lo des"*—
+era imposible de cumplir en el circuito que habíamos escrito es exacta. El texto y el
+mecanismo se contradecían.
 
-2. En la computadora la persona lo tipea en la tienda
+Lo de "no son el mismo mecanismo al revés, son dos" también quedó anotado. Un
+emparejamiento de dispositivos y un OTP se parecen en la pantalla y no en el modelo de
+amenaza.
 
-3. La tienda canjea  NexoTienda → NexoPOS → ClubPay
-                     { storeId, code }  →  { token }
+## Ya está revertido
 
-4. Se abre la sesión con el MISMO token de un solo uso del handoff que ya existe
-```
+La pantalla vuelve a pedir el código, mostrarlo y esperar. Probado de punta a punta.
 
-Nada de sondeo, nada de pedidos pendientes: la compu manda el código y recibe el token,
-o no. **El paso 4 es a propósito**: termina en el canje que ya construimos y probamos.
-Una segunda forma de abrir sesión sería una segunda superficie que auditar, y esta es
-la parte del sistema donde eso menos conviene.
+Tomamos los tres ajustes: **cinco minutos**, el alfabeto sin vocales y **10 intentos
+cada 10 minutos por cuenta**. Y su respuesta sobre el tope de pedidos cierra: sin
+bandeja de pendientes, cincuenta pedidos abiertos producen cero confirmaciones.
 
-De este lado ya está construido y andando: la pantalla de libreta, cuando no hay
-sesión, ofrece un campo para el código y abre la libreta al tipearlo.
+**Mandamos el `client_hint`** —"una computadora con Chrome"— y queda escrito en nuestro
+código, en el de NexoPOS y en los dos pedidos que **no es prueba de nada**: sirve en el
+caso honesto y como color. La defensa es el nombre del comercio, que ustedes deducen de
+la clave, y la pregunta.
 
-## Por qué el código nace en la app y no en la computadora
+## La URL: sacando el `/s/`
 
-Nuestra primera versión lo tenía al revés, y el equipo de NexoPOS nos mostró por qué
-estaba mal. Vale la pena que lo sepan porque es el motivo de toda la forma:
-
-**El ataque de un mecanismo así no es que le roben el código a alguien.** Es que el
-atacante abra el pedido en *su* computadora y convenza a la víctima de meter *ese*
-código en su ClubPay.
-
-Con el código naciendo en la compu, lo que le pedimos a la persona es *"escribí este
-código en tu app"* — una acción que se siente tan inofensiva como emparejar un
-televisor, y contra la que nadie fue entrenado nunca.
-
-Con el código naciendo en la app, el atacante necesita que la víctima **le dicte** un
-código que tiene en su teléfono. Y eso sí tiene diez años de entrenamiento encima:
-*"nunca le des tu código a nadie"* lo repiten todos los bancos del país.
-
-**No elimina el ataque: lo muda a un terreno donde la gente ya está parada.** Es todo
-lo que se puede decir con honestidad de un mecanismo de emparejar pantallas, y
-preferimos decirlo así antes que prometer de más.
-
-## Lo que les toca
-
-**Una pantalla en la app**: "Entrar en otra pantalla", dentro del comercio en Mis
-comercios. Muestra el código y **el aviso al lado**, que es donde la persona está
-mirando:
-
-> **VRCCX**
-> Este código abre tu libreta de Jure Hnos SRL en otra pantalla.
-> Nadie de Jure ni de ClubPay te lo va a pedir. Si alguien te lo pide, no se lo des.
-
-**Un endpoint**, que va a llamar NexoPOS con la clave de ese comercio (nosotros no
-hablamos con ustedes directo, por lo de siempre: no tenemos ni podemos tener una clave
-por comercio):
+Su plantilla es `https://{slug}.nexotienda.app/s/{slug}/libreta`, con el slug dos veces.
+La correcta es:
 
 ```
-POST …/emparejar/canjear   { code, storeId }   →  { token }
+https://{slug}.nexotienda.app/libreta
 ```
 
-El `token` es el mismo que emite hoy `POST /me/merchants/:vinculacion_id/tienda`. No
-hace falta uno nuevo.
+El `/s/{slug}` **es una reescritura interna nuestra**: un proxy toma el subdominio y lo
+convierte en esa ruta. Nunca debió salir de acá, y que ustedes la hayan visto es un
+problema de documentación nuestro. Funciona igual si la mandan, pero es una convención
+interna que puede cambiar sin avisarles.
 
-Tres detalles:
+Lo mismo para la tienda: `https://{slug}.nexotienda.app`, y nada más.
 
-- **El código nace atado a una relación y a un comercio.** Si `storeId` no coincide,
-  rechácenlo: así un código de Jure tipeado en la tienda de Delfín falla solo.
-- **Cinco minutos y un solo uso.** El tiempo de caminar del teléfono al escritorio.
-- **Límite de intentos.** Cinco caracteres se prueban a mano si se puede intentar mil
-  veces. **Este límite solo lo pueden poner ustedes**: NexoTienda no guarda estado y
-  contarlos mal sería peor que no contarlos, porque daría la sensación de que el
-  problema está cubierto.
+## El slug: tienen razón y el ejemplo malo era nuestro
 
-Y una sugerencia sobre el alfabeto: **sin vocales**, para que no se arme ninguna
-palabra sola, y sin 0 ni O. Nosotros usamos `34679BCDFGHJKLMNPQRSTVWXZ`.
+**Nosotros escribimos `jure` en los documentos.** Es el valor de nuestros datos de
+prueba, y lo usamos como si fuera real. El de verdad es `jure-hnos-srl`. Ese 404 lo
+pagaron ustedes por un ejemplo nuestro escrito sin verificar.
 
-## Lo que ya no hace falta
+Y sí: **el slug tiene que llegarles como un dato**, en la ficha del comercio junto al
+nombre y la dirección. Nunca deducido del nombre — lo elige el comerciante y no hay
+ninguna regla que lo derive.
 
-De la versión anterior caen: el pedido pendiente, el estado "pendiente/listo/vencido",
-el sondeo, y la descripción del dispositivo. Esa última la habíamos propuesto como
-defensa y **no lo era** —en ese ataque el que abre el pedido es el atacante, así que
-esa cadena la escribía él—. Con la dirección invertida no hay dónde ponerla ni hace
-falta.
+Van los dos campos que ya les habíamos pedido, ahora con más motivo:
+
+| Campo | Qué es |
+|---|---|
+| `storefrontSlug` | `"jure-hnos-srl"`. La URL es `https://<slug>.nexotienda.app` |
+| `storefrontPublished` | Si la tienda está publicada. **No todo comercio tiene tienda** |
+
+Y el regalo de siempre: pueden cachearlo sin miedo. Si el comerciante lo cambia, el
+viejo sigue redirigiendo para siempre — acá los links viajan por WhatsApp y no se
+pueden dejar morir.
+
+## El circuito, para que quede uno solo escrito
+
+```
+1. La compu pide el código   NexoTienda → NexoPOS → ClubPay
+                             { storeId, clientHint } → { requestId, code, expiresAt }
+2. La compu lo muestra
+3. La persona lo escribe     ClubPay → Mis comercios → el comercio
+                             → «Entrar en otra pantalla» → escribe el código → confirma
+4. La compu pregunta cada 3s → { status: "pendiente" | "listo" + token | "vencido" }
+5. Se canja                  el MISMO token de un solo uso del handoff
+```
+
+Aceptamos sus nombres en `snake_case` y los nuestros en `camelCase`, por si algún día
+pasan derecho sin NexoPOS en el medio.
+
+## Lo que sigue esperando
+
+1. `storefrontSlug` y `storefrontPublished` en la ficha del comercio.
+2. "Ir a la tienda" en Mis comercios — apuntando a `https://<slug>.nexotienda.app`.
+3. "Entrar en otra pantalla" con el campo para el código.

@@ -1,65 +1,65 @@
-# NexoPOS → abrir la libreta en otra pantalla
+# NexoPOS → emparejar: sus dos endpoints eran los correctos
 
 > **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
 >
-> *Reemplaza a la versión anterior. Tenían razón con el `device`, y al corregirlo
-> quedó claro que había que invertir la dirección: sus dos endpoints se vuelven uno.*
+> *Reemplaza a las dos versiones anteriores. Perdón por el ida y vuelta: los dos
+> endpoints que construyeron vuelven a ser los que van.*
 
-El caso: **la tienda abierta en la computadora de casa y ClubPay en el celular.** El
-handoff abre la tienda *en el teléfono*, y la computadora no tiene forma de demostrar
-quién es.
+## Lo que pasó, en corto
 
----
+Ustedes nos mostraron que el `client_hint` no era una defensa. **De ahí sacamos una
+conclusión más grande de la que correspondía**: que había que invertir la dirección del
+código. Les pedimos colapsar sus dos endpoints en uno.
 
-## El endpoint, que es pase de pelota
+ClubPay lo frenó con el argumento que faltaba, y tienen razón: lo que defiende no es la
+descripción del dispositivo, **es la pantalla de confirmación de la app** — y solo la
+dirección original tiene una. Invertido, en el momento en que alguien dicta el código
+la app no participa: no hay dónde intervenir.
+
+Así que **no colapsen nada.** Sus dos endpoints, tal como los construyeron, son los que
+van:
 
 ```
-POST /v1/cuentas/emparejar/canjear        (clave `cuentas`)
-{ "storeId": "12", "code": "VRCCX" }
-→ { "token": "…" }
-    ↳ se lo piden a ClubPay con la clave de ESE comercio, la que ya tienen
+POST /v1/cuentas/emparejar                        (clave `cuentas`)
+{ "storeId": "12", "clientHint": "una computadora con Chrome" }
+→ { "requestId": "…", "code": "VRCCX", "expiresAt": "…" }
 
-… y el token lo canjeamos con POST /v1/cuentas/canjear, que ya existe y ya funciona
+GET  /v1/cuentas/emparejar/:requestId?storeId=12  (clave `cuentas`)
+→ { "status": "pendiente" } | { "status": "listo", "token": "…" } | { "status": "vencido" }
 ```
 
-**Uno solo.** Caen el pedido pendiente, el estado y el sondeo: el código lo genera la
-app, la computadora lo manda, y vuelve el token o un error.
+Nosotros ya revertimos y está probado de punta a punta. Si llegaron a tocar algo, es
+volver atrás; si no, mejor.
 
-El `storeId` viaja por lo mismo que en el canje: el código no dice de qué comercio es,
-y nosotros siempre lo sabemos porque esto pasa en el subdominio de ese comercio.
+## El `client_hint` viaja, y sigue sin ser prueba
 
-## Por qué se invirtió
+Lo mandamos —"una computadora con Chrome"— y quedó escrito en nuestro código y en el
+pedido a ClubPay que **no es prueba de nada**, con el motivo que ustedes dieron. Sirve
+en el caso honesto. La defensa es el nombre del comercio, que ClubPay deduce de la
+clave, y la pregunta.
 
-Por lo que ustedes escribieron. Si el `device` no es prueba de nada —y no lo es, lo
-escribe el atacante— la defensa entera era una frase, sobre una acción que **no tiene
-ninguna defensa cultural**: *"escribí este código en tu app"* se siente como emparejar
-un televisor.
+Pasen el campo tal cual, sin agregarle nada.
 
-Con el código naciendo en la app, el ataque necesita que la víctima **dicte** su
-código. Eso lleva diez años de bancos repitiéndolo, y el aviso va en la misma pantalla
-que el código, que es el momento de máxima atención.
+## Dos números que ClubPay fijó
 
-No elimina el ataque. Lo muda a un terreno donde la gente ya está parada.
+- **Cinco minutos** de vida del código. Nosotros teníamos tres y no lo defendíamos.
+- **10 intentos cada 10 minutos por cuenta.** Ese límite es de ellos: nosotros no
+  guardamos estado y contarlo mal sería peor que no contarlo.
 
-Se pierde la cookie con el `requestId` que ustedes elogiaron, y no duele: protegía de
-*"que otro apruebe tu pedido"*, que no es el ataque — en el real el navegador que abrió
-el pedido es el del atacante.
+Y su pregunta sobre el tope de pedidos por persona quedó contestada: como la app no
+tiene bandeja de pendientes —la persona tiene que escribir el código— cincuenta pedidos
+abiertos producen cero confirmaciones.
 
-## Lo que ya está de este lado
+## Una cosa que sí les toca a ustedes: el slug
 
-La pantalla de libreta, sin sesión, ofrece un campo para el código y abre la libreta al
-tipearlo. Probado contra datos de prueba de punta a punta.
+ClubPay armó el botón "Ir a la tienda" adivinando el slug, y les dio 404. El ejemplo
+malo era nuestro —escribimos `jure`, que es el valor de nuestros datos de prueba,
+cuando el real es `jure-hnos-srl`— y lo usamos en los documentos sin verificarlo.
 
-Y de paso apareció un hueco que arreglamos: **en la pantalla de libreta no se podía
-salir.** La franja con el nombre y el "Salir" estaba solo en la portada, así que se
-podía ver la deuda de alguien en el teléfono de la casa sin ninguna forma de cerrarla
-desde la pantalla donde estaba a la vista.
+**El slug tiene que llegarle a ClubPay como un dato**, en la ficha del comercio junto
+al nombre y la dirección, más `storefrontPublished`. Lo elige el comerciante y no hay
+ninguna regla que lo derive del nombre. Si eso sale de ustedes o de Nexo B2B, decidan
+entre ustedes y avísennos.
 
-## Sus dos preguntas
-
-**Cinco minutos: de acuerdo**, y el argumento es el correcto. Nosotros teníamos tres y
-no defendemos el número.
-
-**Tope de pedidos por persona: sí, y agreguen el otro** — cuántos códigos se pueden
-intentar. Ese límite solo puede vivir en ClubPay: nosotros no guardamos estado, y
-contar mal sería peor que no contar, porque daría la sensación de que está cubierto.
+Y la URL pública es `https://<slug>.nexotienda.app` — sin el `/s/<slug>`, que es una
+reescritura interna nuestra que se nos filtró a la documentación.

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import {
   sessionCookieName,
   sessionCookieOptions,
@@ -191,30 +191,72 @@ export async function productsByIdAction(storeId: string, ids: string[]) {
 // ---------------------------------------------------------------------------
 
 /**
- * La persona tipea acá el código que le mostró ClubPay en el teléfono.
+ * Empareja la pantalla grande con la app.
  *
- * Termina en el **mismo canje** que el handoff desde la app: una segunda forma de
- * abrir sesión sería una segunda superficie que auditar, y esta es la parte del
- * sistema donde eso menos conviene.
- *
- * **El límite de intentos es de ClubPay**, que es quien tiene el código. Acá no hay
- * dónde contarlos —NexoTienda no guarda estado— y contarlos mal sería peor que no
- * contarlos: daría la sensación de que el problema está cubierto.
+ * El `requestId` **queda en una cookie `httpOnly` de este navegador y no vuelve al
+ * cliente**. Es lo que ata la aprobación a esta pantalla: aunque alguien apruebe un
+ * pedido que no es suyo, solo el navegador que lo abrió puede canjearlo. Sin eso, un
+ * código dictado por teléfono le abriría la libreta a cualquiera.
  */
-export async function canjearCodigoAction(
-  storeId: string,
-  storeSlug: string,
-  code: string,
-): Promise<'listo' | 'no_sirve'> {
-  if (!code || code.trim().length < 4) return 'no_sirve';
+export async function abrirEmparejamientoAction(storeId: string, storeSlug: string) {
+  /*
+    Una descripción corta de quién pide, para la pantalla de confirmación de la app.
 
-  const token = await nexopos.redeemPairingCode(storeId, code);
-  if (!token) return 'no_sirve';
+    **No es prueba de nada** —en el ataque el que abre el pedido es el atacante, así
+    que esta cadena la escribe él y puede poner "tu iPhone"— y así se lo dijimos a los
+    dos equipos. Sirve en el caso honesto: "sí, es mi compu". La defensa es el nombre
+    del comercio, que ClubPay deduce de la clave, y la pregunta.
+  */
+  const ua = (await headers()).get('user-agent') ?? '';
+  const navegador = /Edg\//.test(ua)
+    ? 'Edge'
+    : /Chrome\//.test(ua)
+      ? 'Chrome'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : /Safari\//.test(ua)
+          ? 'Safari'
+          : null;
+  const aparato = /Mobile|Android|iPhone/.test(ua) ? 'un teléfono' : 'una computadora';
+  const pista = navegador ? `${aparato} con ${navegador}` : aparato;
 
-  const sesion = await nexopos.redeemLinkToken(token, storeId);
-  if (!sesion || sesion.storeId !== storeId) return 'no_sirve';
+  const par = await nexopos.openPairing(storeId, pista);
+  if (!par) return null;
 
   const jar = await cookies();
+  jar.set(`nt_par_${storeSlug}`, par.requestId, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 5 * 60,
+  });
+
+  // El requestId no se devuelve: la pantalla solo necesita mostrar el código.
+  return { code: par.code, expiresAt: par.expiresAt };
+}
+
+/**
+ * ¿Ya lo aprobaron? Si sí, canjea el token y abre la libreta acá.
+ *
+ * Termina en el **mismo canje** que el handoff desde la app. Una segunda forma de
+ * abrir sesión sería una segunda superficie que auditar, y esta es la parte del
+ * sistema donde eso menos conviene.
+ */
+export async function consultarEmparejamientoAction(
+  storeId: string,
+  storeSlug: string,
+): Promise<'pendiente' | 'listo' | 'vencido'> {
+  const jar = await cookies();
+  const requestId = jar.get(`nt_par_${storeSlug}`)?.value;
+  if (!requestId) return 'vencido';
+
+  const r = await nexopos.pollPairing(storeId, requestId);
+  if (r.status !== 'listo') return r.status;
+
+  const sesion = await nexopos.redeemLinkToken(r.token, storeId);
+  if (!sesion || sesion.storeId !== storeId) return 'vencido';
+
   jar.set(
     sessionCookieName(storeSlug),
     sessionCookieValue({
@@ -224,5 +266,6 @@ export async function canjearCodigoAction(
     }),
     sessionCookieOptions,
   );
+  jar.delete(`nt_par_${storeSlug}`);
   return 'listo';
 }
