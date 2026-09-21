@@ -18,88 +18,107 @@ KEY="${NEXOPOS_KEY_CATALOGO:-}"
 [ -z "$API" ] && { echo "NEXOPOS_API_URL vacío: la tienda estaría corriendo con datos de prueba."; exit 1; }
 [ -z "$KEY" ] && { echo "NEXOPOS_KEY_CATALOGO vacío."; exit 1; }
 
-get() { curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $KEY" "$API$1"; }
-cuerpo() { sed '$d'; }
-codigo() { tail -n1; }
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 
-echo "== 1. La tienda =========================================="
-R=$(get "/v1/stores/$SLUG")
-C=$(printf '%s' "$R" | codigo); B=$(printf '%s' "$R" | cuerpo)
-echo "HTTP $C"
-[ "$C" != "200" ] && { echo "$B" | head -c 400; echo; echo "→ Si no es 200, el resto no tiene sentido."; exit 1; }
-SID=$(printf '%s' "$B" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("id",""))' 2>/dev/null)
-echo "storeId: ${SID:-(no vino)}"
-[ -z "$SID" ] && exit 1
-
-echo
-echo "== 2. Las campañas, tal como llegan ======================="
-R=$(get "/v1/stores/$SID/campaigns")
-C=$(printf '%s' "$R" | codigo); B=$(printf '%s' "$R" | cuerpo)
-echo "HTTP $C"
-printf '%s' "$B" | python3 -m json.tool 2>/dev/null || { echo "$B" | head -c 600; echo; }
-
-echo
-echo "== 3. ¿Sobreviven el filtro de la tienda? ================="
-printf '%s' "$B" | python3 - <<'PY'
+# Los análisis van a archivo y leen el JSON por argumento.
+# No por stdin: un `python3 -` con heredoc ya usa stdin para su propio código, así
+# que la tubería se pierde y todo parece "no es JSON". Ese fue el bug de la v1.
+cat > "$T/campanas.py" <<'PY'
 import sys, json, datetime
-try:
-    cs = json.load(sys.stdin)
-except Exception:
-    print("No es JSON. Ahí está el problema."); raise SystemExit
+cs = json.load(open(sys.argv[1], encoding='utf-8'))
 if not isinstance(cs, list):
-    print("No es un arreglo. La tienda espera una lista."); raise SystemExit
+    print(f"No es un arreglo, es {type(cs).__name__}. La tienda espera una lista."); raise SystemExit
 if not cs:
     print("Vacío: NexoPOS dice que este comercio no tiene campañas vigentes."); raise SystemExit
 ahora = datetime.datetime.now(datetime.timezone.utc)
+vivas = []
 for c in cs:
     fallas = []
     if not c.get("id"):   fallas.append("sin id")
     if not c.get("name"): fallas.append("sin name")
     ids = c.get("productIds")
-    if not isinstance(ids, list): fallas.append(f"productIds no es lista (es {type(ids).__name__})")
+    if not isinstance(ids, list):
+        fallas.append(f"productIds no es lista (es {type(ids).__name__})")
+    elif ids and not all(isinstance(i, str) for i in ids):
+        fallas.append(f"productIds no son textos; el primero es {ids[0]!r}")
     fin = c.get("endsAt")
     if fin:
         try:
-            if datetime.datetime.fromisoformat(fin.replace("Z","+00:00")) < ahora:
+            if datetime.datetime.fromisoformat(fin.replace("Z", "+00:00")) < ahora:
                 fallas.append(f"endsAt ya pasó ({fin})")
         except Exception:
             fallas.append(f"endsAt no se entiende ({fin})")
     n = len(ids) if isinstance(ids, list) else 0
-    estado = "SE DESCARTA → " + ", ".join(fallas) if fallas else "pasa"
-    print(f'- "{c.get("name")}"  productos={n}  hasta={c.get("discountPercent")}  → {estado}')
-    if isinstance(ids, list) and ids and not all(isinstance(i, str) for i in ids):
-        print(f"    ojo: productIds no son textos. Primero: {ids[0]!r}")
+    if fallas:
+        print(f'- "{c.get("name")}"  productos={n}  → SE DESCARTA: {", ".join(fallas)}')
+    else:
+        print(f'- "{c.get("name")}"  productos={n}  hasta={c.get("discountPercent")}%  → pasa')
+        vivas.append(c)
+print()
+print(f"{len(vivas)} de {len(cs)} campañas llegan a la tienda.")
+todos = [i for c in vivas for i in (c.get("productIds") or [])]
+open(sys.argv[2], "w").write(",".join(dict.fromkeys(todos)))
 PY
 
+cat > "$T/productos.py" <<'PY'
+import sys, json
+r = json.load(open(sys.argv[1], encoding='utf-8'))
+items = r if isinstance(r, list) else (r.get("items") or [])
+pedidos = [x for x in sys.argv[2].split(",") if x]
+print(f"pedimos {len(pedidos)}, devolvió {len(items)}")
+vistos = {str(p.get("id")) for p in items}
+for p in items[:8]:
+    print(f'  - {p.get("id"):>8}  {str(p.get("name"))[:46]:46}  precio={p.get("priceCents")}  lista={p.get("listPriceCents")}')
+faltan = [i for i in pedidos if i not in vistos]
+print()
+if len(items) > len(pedidos) * 2 and len(items) > 20:
+    print("→ Devolvió MUCHO más de lo pedido: parece que ignora ?ids= y manda el catálogo.")
+    print("  No rompe la tienda (cruzamos por id), pero es una consulta cara por visita.")
+if faltan:
+    print(f"→ ACÁ ESTÁ. No devolvió: {', '.join(faltan)}")
+    print("  La campaña nombra productos que el catálogo no trae. Causas posibles:")
+    print("   · están agotados y el comercio tiene showsOutOfStock en false")
+    print("   · no están publicados en la tienda")
+    print("  Si falta alguno, esa tarjeta no aparece. Si faltan todos, la sección entera.")
+elif items:
+    print("→ El catálogo trae todo lo que las campañas nombran. La sección tiene que verse.")
+PY
+
+get() { curl -s -o "$2" -w "%{http_code}" -H "Authorization: Bearer $KEY" "$API$1"; }
+
+echo "== 1. La tienda =========================================="
+C=$(get "/v1/stores/$SLUG" "$T/store.json")
+echo "HTTP $C"
+[ "$C" != "200" ] && { head -c 400 "$T/store.json"; echo; exit 1; }
+SID=$(python3 -c 'import sys,json;print(json.load(open(sys.argv[1])).get("id",""))' "$T/store.json")
+echo "storeId: ${SID:-(no vino)}"
+[ -z "$SID" ] && exit 1
+python3 -c '
+import sys, json
+s = json.load(open(sys.argv[1]))
+print("publicada:", s.get("storefrontPublished"), " | muestra agotados:", s.get("showsOutOfStock", "(no viene → se asume sí)"))
+' "$T/store.json"
+
+echo
+echo "== 2. Las campañas, tal como llegan ======================="
+C=$(get "/v1/stores/$SID/campaigns" "$T/camp.json")
+echo "HTTP $C"
+python3 -m json.tool "$T/camp.json" 2>/dev/null || { head -c 600 "$T/camp.json"; echo; }
+
+echo
+echo "== 3. ¿Sobreviven el filtro de la tienda? ================="
+python3 "$T/campanas.py" "$T/camp.json" "$T/ids.txt" || exit 1
+
+IDS=$(cat "$T/ids.txt" 2>/dev/null)
 echo
 echo "== 4. ¿El catálogo devuelve esos productos? ==============="
-IDS=$(printf '%s' "$B" | python3 -c '
-import sys,json
-cs=json.load(sys.stdin)
-for c in cs:
-    ids=c.get("productIds") or []
-    if ids: print(",".join(str(i) for i in ids[:5])); break
-' 2>/dev/null)
 if [ -z "$IDS" ]; then
-  echo "(ninguna campaña trae productos, así que no hay qué pedir)"
+  echo "(ninguna campaña viva trae productos)"
 else
   echo "pidiendo ids=$IDS"
-  R=$(get "/v1/stores/$SID/products?ids=$IDS")
-  C=$(printf '%s' "$R" | codigo); B2=$(printf '%s' "$R" | cuerpo)
+  C=$(get "/v1/stores/$SID/products?ids=$IDS" "$T/prods.json")
   echo "HTTP $C"
-  printf '%s' "$B2" | python3 - <<'PY'
-import sys, json
-try: r = json.load(sys.stdin)
-except Exception: print("No es JSON."); raise SystemExit
-items = r if isinstance(r, list) else (r.get("items") or [])
-print(f"devolvió {len(items)} producto(s)")
-for p in items[:5]:
-    print(f'  - {p.get("id")}  {p.get("name")}  precio={p.get("priceCents")}  lista={p.get("listPriceCents")}')
-if not items:
-    print("→ ACÁ ESTÁ: la campaña nombra productos que el catálogo no devuelve.")
-    print("  O el filtro ?ids= no está soportado, o esos productos están agotados")
-    print("  en una tienda con showsOutOfStock en false — y ahí la sección desaparece sola.")
-PY
+  python3 "$T/productos.py" "$T/prods.json" "$IDS"
 fi
 
 echo
