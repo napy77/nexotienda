@@ -75,13 +75,36 @@ if len(items) > len(pedidos) * 2 and len(items) > 20:
     print("→ Devolvió MUCHO más de lo pedido: parece que ignora ?ids= y manda el catálogo.")
     print("  No rompe la tienda (cruzamos por id), pero es una consulta cara por visita.")
 if faltan:
-    print(f"→ ACÁ ESTÁ. No devolvió: {', '.join(faltan)}")
-    print("  La campaña nombra productos que el catálogo no trae. Causas posibles:")
-    print("   · están agotados y el comercio tiene showsOutOfStock en false")
-    print("   · no están publicados en la tienda")
+    print(f"→ FALTAN: {', '.join(faltan)}")
     print("  Si falta alguno, esa tarjeta no aparece. Si faltan todos, la sección entera.")
+    open(sys.argv[3], "w").write(",".join(faltan))
 elif items:
     print("→ El catálogo trae todo lo que las campañas nombran. La sección tiene que verse.")
+PY
+
+cat > "$T/uno.py" <<'PY'
+import sys, json
+p = json.load(open(sys.argv[1], encoding='utf-8'))
+a = p.get("availability") or {}
+pol = a.get("policy")
+if pol == "stock":
+    hay = a.get("onHand") or 0
+    causa = f"AGOTADO (stock {hay})" if hay <= 0 else f"hay {hay} — no debería faltar"
+elif pol == "declared":
+    q = a.get("quota")
+    if a.get("state") != "available":
+        causa = "AGOTADO (se acabó por hoy)"
+    elif q and (q.get("remaining") or 0) <= 0:
+        causa = "AGOTADO (se acabó el cupo del día)"
+    else:
+        causa = "disponible — no debería faltar"
+elif pol == "unknown":
+    causa = "sin dato — no debería faltar: unknown nunca se esconde"
+else:
+    causa = f"availability rara: {a!r}"
+if p.get("publishedInStore") is False:
+    causa = "NO PUBLICADO en la tienda"
+print(f'{str(p.get("name"))[:40]:40} → {causa}')
 PY
 
 get() { curl -s -o "$2" -w "%{http_code}" -H "Authorization: Bearer $KEY" "$API$1"; }
@@ -118,7 +141,25 @@ else
   echo "pidiendo ids=$IDS"
   C=$(get "/v1/stores/$SID/products?ids=$IDS" "$T/prods.json")
   echo "HTTP $C"
-  python3 "$T/productos.py" "$T/prods.json" "$IDS"
+  python3 "$T/productos.py" "$T/prods.json" "$IDS" "$T/faltan.txt"
+
+  FALTAN=$(cat "$T/faltan.txt" 2>/dev/null)
+  if [ -n "$FALTAN" ]; then
+    echo
+    echo "== 5. ¿Por qué falta cada uno? ============================"
+    # El enlace directo devuelve el producto aunque esté escondido de la lista, así
+    # que acá se puede distinguir "agotado" de "sin publicar" — dos arreglos
+    # distintos que desde la lista se ven idénticos.
+    for ID in ${FALTAN//,/ }; do
+      C=$(get "/v1/stores/$SID/products/$ID" "$T/p.json")
+      printf '  %-8s HTTP %s  ' "$ID" "$C"
+      if [ "$C" = "200" ]; then
+        python3 "$T/uno.py" "$T/p.json"
+      else
+        echo "→ no existe, o no es de esta tienda"
+      fi
+    done
+  fi
 fi
 
 echo
