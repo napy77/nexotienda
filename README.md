@@ -4,8 +4,9 @@ La tienda online del comerciante de pueblo. Se alimenta del stock de **NexoPOS**
 catálogo maestro de **Nexo B2B**; la identidad, la cuenta corriente y el pago del
 comprador viven en **ClubPay**.
 
-- Las reglas de producto que el código no puede violar están en [CLAUDE.md](CLAUDE.md).
-- Lo que se coordina con NexoPOS y con ClubPay está en [docs/](docs/README.md), una carpeta por destinatario.
+- **Empezar por [CLAUDE.md](CLAUDE.md) y [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).**
+- La documentación técnica del sistema está en [docs/](docs/README.md).
+- Lo que se coordina con NexoPOS y con ClubPay, en `docs/a-nexopos/` y `docs/a-clubpay/`.
 
 ## Correr en desarrollo
 
