@@ -5,7 +5,13 @@
 
 ## Dónde corre
 
-Un VPS compartido con **NexoPOS** y **ClubPay**, detrás de NAT.
+Un VPS compartido con **NexoPOS** y **ClubPay**, detrás de NAT, en Nubilus (el
+datacenter de Linware).
+
+**Nexo B2B corre en otra VM, al lado**, también en Nubilus: raíz del repo
+`/var/www/nexob2b/nexob2b`, PM2, Postgres propio (`nexob2b_db`). Un diagnóstico
+que toque B2B —su base, sus logs, su código— se corre allá, no en este VPS. Desde
+acá sólo se la alcanza por HTTPS, con las claves de NexoPOS.
 
 | Cosa | Valor |
 |---|---|
