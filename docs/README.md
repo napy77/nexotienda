@@ -26,6 +26,7 @@ con los que se coordinan tres equipos que no comparten repositorio.
 |---|---|---|
 | `a-nexopos/` | El equipo de NexoPOS | Se manda tal cual, sin editar |
 | `a-clubpay/` | El equipo de ClubPay | Se manda tal cual, sin editar |
+| `a-nexob2b/` | El equipo de Nexo B2B | Se manda tal cual, sin editar |
 | `interno/` | Nosotros | No se manda. Es por qué se decidió algo |
 
 Y cada archivo lo dice otra vez en su primera línea, para el que lo abre suelto.

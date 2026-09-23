@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: **2026-09-21** · commit `279664c`
+Última revisión: **2026-09-23** · commit `4bdd4a4`
 
 Leer siempre junto a `CLAUDE.md`. Actualizar este archivo cuando una tarea cambie el
 estado del sistema.
@@ -51,17 +51,28 @@ pueblo de **Morrison**.
 3. **Webhooks** de cada transición, para dejar de sondear.
 4. Apuntar el emparejamiento al nombre correcto de ClubPay.
 5. **Aviso de campaña invisible** — ver `a-nexopos/campanas-que-no-se-ven.md`.
-6. Nivel del medio del árbol de góndolas.
-7. Interruptor manual abierto/cerrado, con la caja como fuente opcional.
-8. Marca de desvinculación (`linkedAt` ya llega; confirmar que se mueve al desvincular).
+6. **Que el sync de fichas avise cuando el cursor no avanza** — ver
+   `a-nexopos/fichas-sync-sin-aviso.md`.
+7. Nivel del medio del árbol de góndolas.
+8. Interruptor manual abierto/cerrado, con la caja como fuente opcional.
+9. Marca de desvinculación (`linkedAt` ya llega; confirmar que se mueve al desvincular).
 
 **ClubPay**: `storefrontSlug`/`storefrontPublished`, el botón, la pantalla "Entrar en
 otra pantalla", y aceptar vinculación por QR en el mostrador.
 
-**Nexo B2B**: el slug en la ficha del comercio. **Nadie le escribió todavía.**
+**Nexo B2B**:
+
+1. **Arreglar la paginación de `/api/v1/fichas`**, que devuelve siempre la misma
+   página — ver `a-nexob2b/fichas-cursor-trabado.md`. Es lo que impide que cualquier
+   corrección del catálogo maestro llegue a NexoPOS y a la tienda.
+2. El slug en la ficha del comercio. **Nadie le escribió todavía.**
 
 ## Problemas conocidos
 
+- **Los nombres corregidos en Nexo B2B no llegan a la tienda.** NexoTienda muestra lo
+  que manda NexoPOS sin caché; el que está trabado es el sync de fichas de NexoPOS,
+  con el cursor clavado en `2026-07-06 17:50:05.633` porque `/api/v1/fichas` de B2B
+  ignora `desde_id` (diagnosticado el 2026-09-23). Pedido a B2B y a NexoPOS.
 - **Una campaña cuyos productos están todos agotados desaparece sin aviso**, en un
   comercio con `showsOutOfStock: false`. El comportamiento es correcto; el problema es
   que el comerciante no se entera. Pedido a NexoPOS. Diagnóstico:
