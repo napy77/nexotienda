@@ -72,7 +72,9 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
 - **Los nombres corregidos en Nexo B2B no llegan a la tienda.** NexoTienda muestra lo
   que manda NexoPOS sin caché; el que está trabado es el sync de fichas de NexoPOS,
   con el cursor clavado en `2026-07-06 17:50:05.633` porque `/api/v1/fichas` de B2B
-  ignora `desde_id` (diagnosticado el 2026-09-23). Pedido a B2B y a NexoPOS.
+  devuelve siempre la misma página: 57.125 fichas comparten `17:50:05.633760` y el
+  cursor viaja en milisegundos, así que el id nunca desempata (diagnosticado el
+  2026-09-23). Pedido a B2B y a NexoPOS.
 - **Una campaña cuyos productos están todos agotados desaparece sin aviso**, en un
   comercio con `showsOutOfStock: false`. El comportamiento es correcto; el problema es
   que el comerciante no se entera. Pedido a NexoPOS. Diagnóstico:

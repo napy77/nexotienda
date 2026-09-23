@@ -6,6 +6,11 @@ Ustedes no rompieron nada: el sync reenvía `siguiente` tal cual, como acordamos
 DEC-008. El que falla es `/api/v1/fichas` en Nexo B2B, que devuelve siempre la misma
 página. Ya se lo mandamos a ellos con la prueba.
 
+La causa, medida en su base: el UPDATE masivo del 6 de julio dejó 57.125 fichas con
+`ficha_actualizada_at = 17:50:05.633760`, y el cursor viaja en milisegundos
+(`.633`). Como `.633760 > .633` para todas, el id nunca desempata y B2B devuelve
+siempre la primera página. Les propusimos guardar la marca en milisegundos.
+
 Lo que les pedimos es otra cosa: **que la próxima vez nos enteremos por el sistema y
 no por un nombre viejo en la tienda.**
 
@@ -37,11 +42,28 @@ que no sirven para nada.
 
 ## Cuando B2B despliegue su arreglo
 
-No hace falta tocar el cursor: sigue guardado en el 6 de julio y con la paginación
-arreglada recorre todo desde ahí en la siguiente corrida. Lo que sí les pedimos es
-mirar que después de esa corrida **"líneas del stock actualizadas" no sea 0**. Si lo
-es con fichas nuevas de verdad, el problema pasa a ser el cruce entre el `id` o las
+**Hay que reiniciar el cursor una vez**, a antes del bloque empatado. Durante estas
+semanas quedó guardado `023c3e62…`, un id del medio de las 57.125 fichas empatadas, y
+las que están entre la primera página y ese id nunca se leyeron. Releerlas cuesta una
+corrida y el sync es idempotente:
+
+```sql
+UPDATE sync_cursor
+   SET fecha = '2026-07-06 17:50:00+00',
+       id    = '00000000-0000-0000-0000-000000000000'
+ WHERE clave = 'fichas-b2b';
+```
+
+Sólo **después** de que B2B despliegue: antes, con la paginación rota, da lo mismo.
+
+Y después de esa corrida, mirar que **"líneas del stock actualizadas" no sea 0**. Si
+lo es con fichas nuevas de verdad, el problema pasa a ser el cruce entre el `id` o las
 `presentaciones[].id` de la ficha y `products.nexob2b_id`, y nos avisan.
+
+**Un cuidado del lado de ustedes:** si el cursor se guarda como `timestamptz` y se lee
+con un `Date` de JavaScript, pierde los microsegundos. Con la marca en milisegundos del
+lado de B2B no importa, pero conviene no reintroducir la diferencia: la fecha del
+cursor se guarda y se reenvía como texto, tal cual vino.
 
 (Aparte: `docs/DATABASE.md` de ustedes dice que `nexob2b_id` es `pp_…` o `pmp_…`, y
 en producción son UUID. Vale corregirlo para que el próximo que diagnostique no
