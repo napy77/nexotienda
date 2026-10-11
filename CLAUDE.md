@@ -25,7 +25,6 @@ Sin base de datos. Sin ORM. Estado propio: cookies `httpOnly` y `localStorage`.
 src/app/            rutas. Todo cuelga de /s/[sub]/ — el subdominio lo reescribe proxy.ts
 src/components/     UI
 src/lib/nexopos/    el contrato con NexoPOS: types.ts (port), client.ts (HTTP), fixtures.ts
-src/lib/payments/   el riel de cobro: port + mercadopago + sandbox
 src/lib/*.ts        reglas: horario, cerrado, credit, libreta, session, slug, arbol
 deploy/             scripts de despliegue y diagnóstico
 docs/               documentación (ver abajo)
@@ -35,8 +34,10 @@ contexto/           PDFs de negocio. NO analizar salvo pedido explícito
 ## Reglas críticas que nunca se rompen
 
 1. **Libro y riel, no balance (P1).** El acreedor es siempre el comercio. La plata va
-   del comprador al comercio por el Mercado Pago **del comercio**. Nunca por una
-   cuenta nuestra.
+   del comprador al comercio por el Mercado Pago **del comercio**, que el comercio
+   conecta una sola vez en ClubPay. Nunca por una cuenta nuestra.
+   **NexoTienda no integra Mercado Pago**: le pide el link a NexoPOS.
+   **Y nunca marca nada como pagado**: lo confirma Mercado Pago o el comerciante.
 2. **No somos cobradores (P2).** Nada de avisos de mora ni recordatorios escalados.
 3. **Ningún comercio ve la deuda de un cliente con otro comercio (P3).** El
    `accountId` es de la **relación**, no de la persona. No existe una clave que
@@ -90,3 +91,13 @@ está resumido en `docs/DECISIONS.md`.
 - **Un archivo de `docs/a-*` tiene un solo destinatario** y se reenvía tal cual.
 - Al terminar una tarea que cambie el estado del sistema, actualizar
   `docs/CURRENT_STATE.md` y, si corresponde, `docs/DECISIONS.md`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

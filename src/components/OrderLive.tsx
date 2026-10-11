@@ -31,21 +31,32 @@ import { orderPulseAction } from '@/app/actions';
 const ACTIVO = 15_000;
 const TRANQUILO = 45_000;
 const AFLOJA_DESPUES_DE = 5 * 60_000;
+/**
+ * Volviendo de Mercado Pago, el pago puede tardar unos segundos en acreditarse. Ese
+ * minuto se pregunta seguido —es cuando la persona está mirando la pantalla esperando
+ * saber si pagó— y después se vuelve al ritmo de siempre.
+ */
+const CONFIRMANDO = 2_500;
+const CONFIRMANDO_DURANTE = 60_000;
 
 export function OrderLive({
   code,
   pulse,
   terminal,
+  confirmandoPago = false,
 }: {
   code: string;
   /** La huella de lo que está en pantalla. Si el servidor devuelve otra, se refresca. */
   pulse: string;
   /** Entregado o cancelado: no hay nada más que esperar. */
   terminal: boolean;
+  /** Hay un pago online pendiente: el primer minuto se pregunta mucho más seguido. */
+  confirmandoPago?: boolean;
 }) {
   const router = useRouter();
   const [mirando, setMirando] = useState(false);
   const ultimoCambio = useRef(Date.now());
+  const montado = useRef(Date.now());
 
   const revisar = useCallback(
     async (forzar = false) => {
@@ -68,11 +79,12 @@ export function OrderLive({
     function agendar() {
       clearTimeout(turno);
       const quieto = Date.now() - ultimoCambio.current > AFLOJA_DESPUES_DE;
+      const apurado = confirmandoPago && Date.now() - montado.current < CONFIRMANDO_DURANTE;
       turno = setTimeout(async () => {
         if (!vivo) return;
         if (document.visibilityState === 'visible') await revisar();
         if (vivo) agendar();
-      }, quieto ? TRANQUILO : ACTIVO);
+      }, apurado ? CONFIRMANDO : quieto ? TRANQUILO : ACTIVO);
     }
 
     function alCambiarVisibilidad() {
@@ -92,7 +104,7 @@ export function OrderLive({
       clearTimeout(turno);
       document.removeEventListener('visibilitychange', alCambiarVisibilidad);
     };
-  }, [revisar, terminal]);
+  }, [revisar, terminal, confirmandoPago]);
 
   if (terminal) return null;
 

@@ -539,7 +539,22 @@ export type PaymentMethod =
  * `no_aplica` es el caso del efectivo y del fiado: no hay nada que cobrar online.
  * El fiado no es un pago — es una anotación que se cobra en el cierre (D27).
  */
-export type PaymentStatus = 'no_aplica' | 'pendiente' | 'pagado' | 'rechazado';
+export type PaymentStatus = 'no_aplica' | 'pendiente' | 'pagado' | 'rechazado' | 'reembolsado';
+
+/**
+ * El resultado de pedir un link de pago.
+ *
+ * `ya_pagado` no es un error: muchas veces se pagó con un link anterior que el
+ * comprador tenía abierto en otra pestaña. Lo que corresponde es mostrarle el pedido.
+ */
+export type CheckoutResult =
+  | { ok: true; checkoutUrl: string; expiresAt?: string }
+  | {
+      ok: false;
+      motivo: 'ya_pagado' | 'no_disponible' | 'reintentar';
+      /** El mensaje de NexoPOS para el comprador, si mandó uno. Se muestra tal cual. */
+      mensaje: string | null;
+    };
 
 /** D18: la notificación no es una aceptación. */
 export type OrderStatus =
@@ -577,6 +592,11 @@ export interface Order {
   address?: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /**
+   * Por qué se rechazó el pago, **en castellano y escrito para el comprador**. Lo
+   * redacta NexoPOS y se muestra tal cual, sin reescribirlo.
+   */
+  paymentError?: string;
   /** Id del cobro en el proveedor, cuando hubo uno. */
   paymentId?: string;
   status: OrderStatus;
@@ -745,19 +765,28 @@ export interface NexoPosPort {
 
   createOrder(order: NewOrder): Promise<Order>;
   getOrder(code: string): Promise<Order | null>;
-  confirmOrderPayment(code: string, paymentId: string): Promise<Order | null>;
-
   /**
-   * Un pago contra la cuenta, por un importe libre.
+   * Pide el link de Mercado Pago para un pedido `online`.
    *
-   * NexoTienda NO elige qué resumen se paga: manda un monto y NexoPOS lo imputa del
-   * más viejo al más nuevo, con lo que sobre a cuenta del período abierto (D31). La
-   * imputación es del libro, no de la vidriera.
+   * **El importe no viaja**: lo pone NexoPOS del total del pedido. Si viajara, se
+   * podría pagar menos de lo que se compró. Se puede pedir de nuevo —rechazó la
+   * tarjeta, venció a los 30 minutos— y cada pedido nuevo da de baja el anterior:
+   * hay un solo link vivo por pedido, así que no se guardan.
    */
-  registerAccountPayment(input: {
-    storeId: string;
-    accountId: string;
-    amountCents: number;
-    paymentId: string;
-  }): Promise<MerchantAccount | null>;
+  createCheckout(code: string, returnUrl: string): Promise<CheckoutResult>;
+
+  /*
+    **No hay ningún método para marcar algo como pagado, y es a propósito.**
+
+    Existió (`confirmOrderPayment`, `registerAccountPayment`) y por él un botón de
+    sandbox en producción podía dejar pedidos y libretas pagados que nadie pagó.
+
+    Quien confirma un pago es quien lo ve: Mercado Pago para el cobro online, y **el
+    comerciante en NexoPOS** para la transferencia —mira su banco— y el efectivo —lo
+    recibe en la mano—. La tienda no ve ninguna de las dos cosas. Puede juntar
+    evidencia; nunca dar el veredicto.
+
+    La libreta se paga en ClubPay, que es donde el comprador elige tarjeta, débito o
+    Mercado Pago. No pasa por la tienda.
+  */
 }

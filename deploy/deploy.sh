@@ -89,8 +89,8 @@ NEXOPOS_KEY_CATALOGO=
 NEXOPOS_KEY_PEDIDOS=
 NEXOPOS_KEY_CUENTAS=
 
-# Mercado Pago del comercio. Vacío = el cobro corre en sandbox.
-MP_ACCESS_TOKEN=
+# No hay variables de Mercado Pago: el cobro online lo pide NexoPOS, que lo pide a
+# ClubPay, que es el único que tiene las credenciales del comercio.
 EOF
   chown "$APP_USER:$APP_USER" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
@@ -107,6 +107,12 @@ else
       echo "    Las de ahora son NEXOPOS_KEY_CATALOGO, NEXOPOS_KEY_PEDIDOS y NEXOPOS_KEY_CUENTAS."
     fi
   done
+  # Mercado Pago ya no se integra desde acá: el comercio lo conecta una sola vez en
+  # ClubPay y la tienda le pide el link a NexoPOS. Un token acá no lo lee nadie.
+  if grep -qE "^MP_ACCESS_TOKEN=.+" "$ENV_FILE"; then
+    echo "  ⚠ $ENV_FILE tiene MP_ACCESS_TOKEN con valor, y ya no se usa: borralo."
+    echo "    Una credencial de Mercado Pago no tiene por qué estar en este servidor."
+  fi
 fi
 
 echo "══ 4/6 · Dependencias y build ═══════════════════════════════════"

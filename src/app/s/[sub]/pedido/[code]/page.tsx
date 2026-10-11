@@ -7,10 +7,13 @@ import { statusSteps } from '@/lib/orderStatus';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
 import { OrderCancelled } from '@/components/OrderCancelled';
 import { OrderLive } from '@/components/OrderLive';
+import { PagoOnline } from '@/components/PagoOnline';
 
 const PAYMENT_LABEL: Record<string, string> = {
   efectivo_entrega: 'Efectivo al recibir',
-  online: 'Pagado online',
+  // "Pagado online" se leía igual aunque el pago estuviera pendiente o rechazado.
+  online: 'Mercado Pago',
+  transferencia: 'Transferencia',
   cuenta_corriente: 'Anotado en la libreta',
 };
 
@@ -18,6 +21,7 @@ const PAYMENT_STATE: Record<string, { text: string; tone: string }> = {
   pendiente: { text: 'Falta pagarlo', tone: 'bg-amber-100 text-amber-800' },
   pagado: { text: 'Pagado', tone: 'bg-emerald-100 text-emerald-800' },
   rechazado: { text: 'El pago no salió', tone: 'bg-red-100 text-red-800' },
+  reembolsado: { text: 'Devuelto', tone: 'bg-neutral-200 text-neutral-800' },
 };
 
 export default async function PedidoPage({
@@ -48,6 +52,7 @@ export default async function PedidoPage({
     order.paymentStatus,
     order.readyEstimate ?? '',
     order.cancelReason ?? '',
+    order.paymentError ?? '',
   ].join('|');
 
   return (
@@ -115,7 +120,12 @@ export default async function PedidoPage({
             })}
           </ol>
 
-          <OrderLive code={order.code} pulse={pulse} terminal={order.status === 'entregado'} />
+          <OrderLive
+            code={order.code}
+            pulse={pulse}
+            terminal={order.status === 'entregado' && order.paymentStatus !== 'pendiente'}
+            confirmandoPago={order.paymentMethod === 'online' && order.paymentStatus === 'pendiente'}
+          />
         </div>
         )}
 
@@ -150,7 +160,12 @@ export default async function PedidoPage({
               <dt className="text-neutral-600">Pago</dt>
               <dd className="flex items-center gap-2 font-medium">
                 {PAYMENT_LABEL[order.paymentMethod]}
-                {order.paymentStatus !== 'no_aplica' && (
+                {/*
+                  Con un estado que no conocemos se omite la etiqueta en vez de caerse:
+                  antes, `reembolsado` hacía `undefined.tone` y la pantalla del pedido
+                  —la que el comprador tiene abierta— se rompía entera.
+                */}
+                {order.paymentStatus !== 'no_aplica' && PAYMENT_STATE[order.paymentStatus] && (
                   <span
                     className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                       PAYMENT_STATE[order.paymentStatus].tone
@@ -200,12 +215,13 @@ export default async function PedidoPage({
             ) : null
           )}
 
-          {order.paymentStatus === 'pendiente' && (
-            <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-              El pedido ya le llegó a {store.name}, pero el pago quedó sin completar.
-              Podés pagarlo cuando lo retires o hablando con ellos.
-            </p>
-          )}
+          {/*
+            Solo el pago con Mercado Pago tiene algo que mostrar acá. La transferencia y
+            el efectivo los confirma el comerciante en NexoPOS —es el que ve su banco y
+            recibe la plata— y para el comprador no hay nada que hacer en esta pantalla.
+            Un pedido cancelado tampoco: su reembolso lo cuenta la tarjeta de cancelación.
+          */}
+          {order.paymentMethod === 'online' && !cancelado && <PagoOnline order={order} />}
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <ContactButton store={store} />

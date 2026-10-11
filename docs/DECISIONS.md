@@ -33,8 +33,8 @@ emulaban la imputación del pago, contradiciendo D31.
 **Motivo.** Consecuencia de DEC-001. Una base propia sería una segunda copia de datos
 ajenos, con la obligación de mantenerla sincronizada.
 
-**Consecuencias.** Despliegue trivial, sin migraciones ni backups. El sandbox de pagos
-y los pedidos en modo fixtures viven en memoria y se pierden al reiniciar.
+**Consecuencias.** Despliegue trivial, sin migraciones ni backups. Los pedidos en
+modo fixtures viven en memoria y se pierden al reiniciar.
 
 ## DEC-003 — Tres claves por capacidad, no una por comercio
 
@@ -187,12 +187,48 @@ cuando acababa de funcionar.
 
 **Afecta** NexoTienda, NexoPOS.
 
+## DEC-014 — Mercado Pago se conecta una vez, en ClubPay
+
+**Fecha** 2026-10-11 · **Estado** vigente · **Decidió** Germán (ADR-0001 del ecosistema)
+
+**Decisión.** El comercio hace el OAuth de Mercado Pago **una sola vez, en ClubPay**, y
+se reutiliza en el mostrador y en la tienda. NexoTienda **no integra Mercado Pago**: le
+pide el link a NexoPOS y consulta el estado del pedido.
+
+**Motivo.** Que un comercio conecte Mercado Pago en tres apps es tres veces la fricción
+y tres lugares con credenciales. ClubPay ya lo necesitaba para cobrar con descuentos y
+pagar libretas.
+
+**Consecuencias.** Se descartó `lib/payments/mercadopago.ts` antes de terminarlo. No
+hay `MP_ACCESS_TOKEN`. La decisión "autorizar vs capturar" dejó de ser nuestra.
+
+**Afecta** los cuatro sistemas.
+
+## DEC-015 — La tienda nunca declara algo como pagado
+
+**Fecha** 2026-10-11 · **Estado** vigente
+
+**Decisión.** El port no tiene ningún método para marcar un pedido o una libreta como
+pagados. Quien confirma un pago es quien lo ve: **Mercado Pago** el cobro online, **el
+comerciante en NexoPOS** la transferencia (mira su banco) y el efectivo (lo recibe en
+la mano), y **ClubPay** la libreta.
+
+**Motivo.** El sandbox de pagos corría en producción —nadie había seteado
+`MP_ACCESS_TOKEN`, así que era el adapter elegido— y su botón "Aprobar" marcaba
+pedidos y libretas como pagados sin que entrara plata. La tienda no ve el banco ni la
+caja: no puede ser la que confirma.
+
+**Consecuencias.** Se borró el sandbox entero en vez de esconderlo: una simulación del
+cobro al lado de la API real es exactamente el riesgo. Para desarrollar, la emulación
+vive **dentro del adapter de fixtures**, que por construcción no convive con un NexoPOS
+real. La tienda puede juntar evidencia —el alias, a futuro el comprobante— nunca el
+veredicto.
+
 ---
 
 ## Abiertas
 
 | Tema | Estado |
 |---|---|
-| Autorizar vs capturar en Mercado Pago | Sin decidir. No bloquea: el piloto corre con efectivo al recibir |
 | Quién es dueño del `storefrontSlug` | `PENDIENTE DE VALIDAR`. ClubPay lo pide a Nexo B2B; hoy lo sirve NexoPOS |
 | QR de vinculación en el mostrador | Pedido a ClubPay. Ata **una ficha** a una persona, no un DNI — y por eso esquiva los clientes duplicados |

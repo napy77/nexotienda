@@ -27,7 +27,11 @@ pueblo de **Morrison**.
 - **Campañas**: secciones en la portada, cinta roja por producto, "hasta X%" en el
   título, página propia por campaña.
 - **Libreta**: se abre desde ClubPay (`/entrar?t=`), muestra saldo, disponible, cierre
-  y vencimiento, y permite pagar. Se cierra con "Salir". Revocación por `linkedAt`.
+  y vencimiento. **Se paga en ClubPay, no en la tienda.** Se cierra con "Salir".
+  Revocación por `linkedAt`.
+- **Pago con Mercado Pago** vía NexoPOS (`/checkout`): construido y probado contra
+  fixtures en los tres caminos —pagado, rechazado con reintento, confirmando—. Solo se
+  ofrece con `acceptsMercadoPago: true`.
 - **Página del pueblo**: buscador de existencias, solo con los comercios que hicieron
   opt-in.
 
@@ -37,7 +41,7 @@ pueblo de **Morrison**.
 |---|---|
 | **Emparejar la libreta en otra pantalla** (PC + código) | Construido y desplegado de este lado. **NexoPOS debe apuntar a `/pos/tienda/emparejar`** (llamaba a `/pos/tienda/pairings`, un nombre inventado). ClubPay tiene su punta y la pantalla de la app sale en la próxima versión |
 | **Botón "Ir a la tienda" en ClubPay** | ClubPay necesita `storefrontSlug` y `storefrontPublished` en la ficha del comercio. **Ese dato es de Nexo B2B** y es el único que impide que un comercio nuevo tenga tienda sin carga manual |
-| **Cobro online** | `mercadopago.ts` **lanza error**: falta el onboarding del comercio como vendedor. Con `MP_ACCESS_TOKEN` vacío corre el sandbox, que guarda en memoria y se pierde al reiniciar |
+| **Mercado Pago contra NexoPOS real** | Falta probarlo contra el simulador de NexoPOS (pedido: una instancia de prueba). Hoy ningún comercio lo tiene prendido; la primera venta real la hace ClubPay con plata real |
 | **Árbol de góndolas de 3 niveles** | Soportado; falta que NexoPOS mande el nivel del medio. Mientras tanto se derivan las hojas y la fila se corta a 12 chips |
 | **Highlights** (más vendidos / más buscados) | Consumido. "Lo más buscado" va a estar vacío hasta que se junten búsquedas |
 
@@ -79,11 +83,13 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
   comercio con `showsOutOfStock: false`. El comportamiento es correcto; el problema es
   que el comerciante no se entera. Pedido a NexoPOS. Diagnóstico:
   `deploy/diagnostico-campanas.sh <slug>`.
-- **El sandbox de pagos guarda en memoria**: al reiniciar el servicio se pierden los
-  intentos de cobro.
-- **`registerAccountPayment` sigue apuntando a `/v1/stores/:id/accounts/:acc/payments`**,
-  el espacio de nombres viejo, mientras `getAccount` ya migró a
-  `/v1/cuentas/:id?storeId=`. `PENDIENTE DE VALIDAR` si ese endpoint sigue vivo.
+- **`PENDIENTE DE VALIDAR` si hubo pagos falsos.** Hasta el 11/10 el sandbox de pagos
+  corría en producción: "Pagar ahora" y el pago de la libreta llevaban a un botón
+  "Aprobar" que marcaba pedidos (`/payment`) y libretas (`registerAccountPayment`)
+  como pagados sin plata. Se retiró entero. NexoPOS puede buscar `paymentId` con
+  prefijo `pay_sbx_`.
+- **NexoTienda no recibe webhooks.** Consulta el pedido. Confirmar que NexoPOS no esté
+  intentando entregarnos avisos.
 - **`deploy/agregar-host.sh` es código muerto**: era para la lista explícita de hosts,
   anterior al certificado comodín.
 
@@ -99,6 +105,9 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
 
 ## Cambios recientes
 
+- **Cobro con Mercado Pago vía NexoPOS** (CR-0002). Se retiró `lib/payments`, el
+  sandbox, la pantalla `/pagar`, el pago de la libreta y todo método que marcara algo
+  como pagado. `online` sale de `acceptsMercadoPago`, no de `acceptsOnlinePayment`.
 - Campañas con descuento **por producto**; `discountPercent` pasó a ser el techo de la
   tanda y se muestra con "hasta". Se quitó el respaldo que le ponía el porcentaje de la
   campaña a un producto sin rebaja.

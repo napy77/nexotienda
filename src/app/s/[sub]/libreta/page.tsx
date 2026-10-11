@@ -4,7 +4,6 @@ import { nexopos } from '@/lib/nexopos';
 import { libretaDeLaSesion } from '@/lib/libreta';
 import { money, longDate } from '@/lib/format';
 import { ContactButton, StoreShell } from '@/components/StoreShell';
-import { PayAccount } from '@/components/PayAccount';
 import { EntrarEnEstaPantalla } from '@/components/EntrarEnEstaPantalla';
 import { LibretaBar } from '@/components/LibretaBar';
 
@@ -66,7 +65,6 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
     );
   }
 
-  const canPayOnline = store.acceptedPayments.includes('online');
   const debe = account.balanceCents;
 
   return (
@@ -106,17 +104,17 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
               El período en curso vence el {longDate(account.currentPeriod.dueDate)}.
             </p>
           )}
-          {debe > 0 && canPayOnline && (
-            <div className="mt-4">
-              {/* Importe libre contra la cuenta, no contra un resumen elegido (D31). */}
-              <PayAccount
-                storeId={store.id}
-                storeSlug={store.slug}
-                storeName={store.name}
-                accountId={account.accountId}
-                owedCents={debe}
-              />
-            </div>
+          {/*
+            La libreta se paga en ClubPay, no acá. Es donde el comprador elige tarjeta,
+            débito o Mercado Pago, y donde ya vive la pila de resúmenes. Antes había un
+            botón de pago en esta pantalla que iba por un sandbox y podía anotar un pago
+            en la cuenta corriente sin que entrara plata.
+          */}
+          {debe > 0 && (
+            <p className="mt-3 text-sm text-neutral-600">
+              Para pagar, entrá a <span className="font-semibold">ClubPay</span> → Mis
+              comercios → {store.name}. Ahí elegís tarjeta, débito o Mercado Pago.
+            </p>
           )}
         </div>
       )}

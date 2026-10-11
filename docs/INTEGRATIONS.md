@@ -36,7 +36,7 @@ B2B. Ver DEC-003 en `DECISIONS.md`.
 
 - **Dirección** escritura + lectura · **Clave** `NEXOPOS_KEY_PEDIDOS`
 - **Endpoints** `POST /v1/orders`, `GET /v1/orders/:code`,
-  `POST /v1/orders/:code/payment`
+  `POST /v1/orders/:code/checkout` (ver §7). **`/payment` no se llama nunca** (ver §8)
 - **Owner del pedido** NexoPOS. Aterriza como nota de venta, mismo stock, misma caja.
 - **Reglas**
   - **Los totales los calcula NexoPOS.** Los nuestros son para mostrar.
@@ -53,8 +53,7 @@ B2B. Ver DEC-003 en `DECISIONS.md`.
   - `POST /v1/cuentas/canjear` `{token, storeId}` — canje del handoff
   - `POST /v1/cuentas/emparejar` `{storeId, clientHint}` — abre un emparejamiento
   - `GET /v1/cuentas/emparejar/:requestId?storeId=` — sondeo
-  - `POST /v1/stores/:id/accounts/:acc/payments` — pago. **`PENDIENTE DE VALIDAR`:
-    quedó en el espacio de nombres viejo**
+  - **No hay endpoint de pago de libreta**: la libreta se paga en ClubPay
 - **Regla** la clave dice *qué endpoint*; el token dice *de quién*. La clave de
   `cuentas` sola no alcanza.
 
@@ -98,14 +97,47 @@ B2B. Ver DEC-003 en `DECISIONS.md`.
 - **`clientHint`** ("una computadora con Chrome") viaja pero **no es prueba de nada**:
   en un ataque lo escribe el atacante.
 
-## 7. NexoTienda → Mercado Pago
+## 7. Cobro con Mercado Pago — vía NexoPOS, nunca directo
 
-- **Estado** `PENDIENTE DE VALIDAR` — el adapter existe y **lanza error**. Falta el
-  onboarding del comercio como vendedor.
-- **Modelo** marketplace: la preferencia se crea contra la cuenta **del comercio**,
-  con `marketplace_fee` para la comisión. **La plata nunca toca una cuenta de Nexo.**
-- **Degradación** sin `MP_ACCESS_TOKEN` corre el sandbox en memoria. Sin Mercado Pago
-  la cuenta corriente sigue funcionando: solo se pierde el pago desde la app.
+- **Decisión** (Germán, 11/10, ADR-0001 del ecosistema): el comercio conecta Mercado
+  Pago **una sola vez, en ClubPay**, y ese vínculo se reutiliza en el mostrador y en
+  la tienda. **NexoTienda no integra Mercado Pago**: no tiene credenciales, ni token,
+  ni avisos de Mercado Pago.
+- **Cadena** NexoTienda → NexoPOS → ClubPay → Mercado Pago.
+- **Cuándo se ofrece** solo con `acceptsMercadoPago: true` en el `Store`. **Nunca con
+  `acceptsOnlinePayment`**, que da `true` también con contra entrega.
+- **Flujo**
+  1. `POST /v1/orders` con `paymentMethod: "online"` (= Mercado Pago). Nace
+     `paymentStatus: "pendiente"`. Si el comercio no lo acepta, 409.
+  2. `POST /v1/orders/:code/checkout` `{returnUrl}` → `{checkoutUrl, expiresAt}`.
+     **El importe no viaja.** Un solo link vivo por pedido; pedir otro da de baja el
+     anterior. 409 «ya está pagado» se trata como éxito.
+  3. Se redirige con `window.location.assign` (es otro sitio).
+  4. Al volver, **se consulta `GET /v1/orders/:code`. La URL de vuelta no se mira**:
+     `status=approved` lo puede escribir cualquiera.
+  5. `pendiente` → "Estamos confirmando…" y sondeo cada 2,5 s el primer minuto;
+     `rechazado` → `paymentError` tal cual + reintento; `reembolsado` → aviso.
+- **`returnUrl`** completa y pública: `https://<slug>.nexotienda.app/pedido/<code>`. Si
+  se entró sin subdominio (desarrollo), lleva `/s/<slug>`.
+- **Avisos (webhooks)**: el diseño del CR-0002 prevé NexoPOS → NexoTienda.
+  **NexoTienda no tiene receptor**; alcanza con consultar el pedido.
+  `PENDIENTE DE VALIDAR` que NexoPOS no esté intentando entregarnos avisos.
+
+## 8. Quién confirma un pago
+
+**Nunca NexoTienda.** No hay ningún método en el port para marcar algo como pagado.
+
+| Medio | Quién confirma | Cómo |
+|---|---|---|
+| Mercado Pago | **Mercado Pago** | Le avisa a ClubPay → NexoPOS |
+| Transferencia | **El comerciante, en NexoPOS** | Mira su banco |
+| Efectivo | **El comerciante, en NexoPOS** | Lo recibe al entregar o al retirar |
+| Libreta | **ClubPay** | El comprador paga ahí, con tarjeta, débito o Mercado Pago |
+
+La tienda puede juntar evidencia —el alias de la transferencia, y a futuro el
+comprobante— pero nunca dar el veredicto. Antes existía `POST /v1/orders/:code/payment`
+llamado desde un sandbox que corría en producción, y un botón "Aprobar" podía dejar
+pedidos y libretas pagados que nadie pagó.
 
 ## Riesgos
 

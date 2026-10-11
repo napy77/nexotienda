@@ -52,7 +52,6 @@ arranca con datos de prueba**, que es el modo demo.
 | `NEXOPOS_KEY_CATALOGO` | Lo que la tienda le muestra a cualquiera |
 | `NEXOPOS_KEY_PEDIDOS` | Escribe pedidos; no llega a ninguna cuenta |
 | `NEXOPOS_KEY_CUENTAS` | La sensible. Además pide la sesión del token de ClubPay |
-| `MP_ACCESS_TOKEN` | Vacío → el cobro corre en sandbox |
 
 **Tres claves separadas por capacidad, no por comercio**: es un solo servidor que
 renderiza cualquier tienda. Ver DEC-003.
@@ -111,7 +110,7 @@ El ruteo es por subdominio: `http://supersol.localhost:3000`, `http://morrison.l
 |---|---|---|
 | Datos | Fixtures, salvo que se setee `NEXOPOS_API_URL` | API real |
 | Puerto | 3000 | 3100 |
-| Cobro | Sandbox en memoria | Sandbox hasta que Mercado Pago exista |
+| Cobro online | Emulado en fixtures (`FIXTURES_PAGO=rechazar` para el rechazo) | NexoPOS → ClubPay → Mercado Pago |
 | `/vincular` | Simula el vínculo | **404** |
 
 Antes de pushear: `npm run lint` (es `tsc --noEmit`) y `npx next build`.

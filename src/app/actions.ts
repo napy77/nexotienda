@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import {
   sessionCookieName,
@@ -9,7 +8,6 @@ import {
 } from '@/lib/session';
 import { nexopos } from '@/lib/nexopos';
 import type { NewOrder, TownSearchHit } from '@/lib/nexopos/types';
-import { payments } from '@/lib/payments';
 
 export async function searchTownAction(
   townSlug: string,
@@ -44,99 +42,65 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
     };
   }
 
-  // El efectivo y el fiado no pasan por el rail: no hay nada que cobrar online.
+  // Solo Mercado Pago se cobra acá. El efectivo y la transferencia los confirma el
+  // comerciante en NexoPOS —es el que ve su banco y recibe la plata en la mano— y el
+  // fiado se anota en la libreta.
   if (order.paymentMethod !== 'online') {
     return { ok: true, code: order.code };
   }
 
-  try {
-    const intent = await payments.createIntent({
-      kind: 'orden',
-      reference: order.code,
-      storeId: order.storeId,
-      storeSlug: order.storeSlug,
-      storeName: order.storeName,
-      amountCents: order.totalCents,
-      description: `Pedido ${order.code} en ${order.storeName}`,
-      returnUrl: `/s/${order.storeSlug}/pedido/${order.code}`,
-    });
-    return { ok: true, code: order.code, checkoutUrl: intent.checkoutUrl };
-  } catch (e) {
-    // El pedido ya existe y le llegó al comercio. Que falle el cobro no lo borra:
-    // lo dejamos pendiente y que lo arreglen entre ellos.
-    console.error('[nexotienda] createIntent falló', e);
-    return { ok: true, code: order.code };
-  }
+  const pago = await nexopos.createCheckout(
+    order.code,
+    await urlDelPedido(order.storeSlug, order.code),
+  );
+  // Si el link no salió, el pedido igual existe y le llegó al comercio. La pantalla
+  // del pedido ofrece pagarlo de nuevo; no se borra una compra por un cobro fallido.
+  return { ok: true, code: order.code, checkoutUrl: pago.ok ? pago.checkoutUrl : undefined };
 }
 
 /**
- * Cobrar contra la libreta, por un importe libre (D31).
+ * La URL pública del pedido, completa: Mercado Pago vuelve ahí cuando termina.
  *
- * NexoTienda no elige qué resumen se paga: manda un monto y NexoPOS lo imputa del
- * más viejo al más nuevo, con lo que sobre a cuenta del período abierto. La
- * imputación es del libro, no de la vidriera.
+ * En producción es la del subdominio —`https://jure-hnos-srl.nexotienda.app/pedido/P-…`—
+ * y no la ruta interna `/s/<sub>/…`, que es una reescritura nuestra y no sale del repo.
+ *
+ * Si se entró sin subdominio —en desarrollo, `localhost:3000/s/supersol/…`— la ruta
+ * corta no tiene cómo saber de qué tienda es y la vuelta cae en "no encontramos esta
+ * tienda". Ahí se usa la ruta con el slug adentro.
  */
-export async function payAccountAction(input: {
-  storeId: string;
-  storeSlug: string;
-  storeName: string;
-  accountId: string;
-  amountCents: number;
-}): Promise<{ ok: true; checkoutUrl: string } | { ok: false; error: string }> {
-  if (input.amountCents <= 0) {
-    return { ok: false, error: 'El monto tiene que ser mayor a cero.' };
-  }
-  try {
-    const intent = await payments.createIntent({
-      kind: 'resumen',
-      reference: `${input.storeId}|${input.accountId}`,
-      storeId: input.storeId,
-      storeSlug: input.storeSlug,
-      storeName: input.storeName,
-      amountCents: input.amountCents,
-      description: `Libreta de ${input.storeName}`,
-      returnUrl: `/s/${input.storeSlug}/libreta`,
-    });
-    return { ok: true, checkoutUrl: intent.checkoutUrl };
-  } catch (e) {
-    console.error('[nexotienda] payAccount falló', e);
-    return { ok: false, error: 'No pudimos iniciar el pago. Probá de nuevo en un momento.' };
-  }
+async function urlDelPedido(slug: string, code: string): Promise<string> {
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+  const proto = h.get('x-forwarded-proto') ?? (host.includes('localhost') ? 'http' : 'https');
+  const enSuSubdominio = host.toLowerCase().startsWith(`${slug.toLowerCase()}.`);
+  const ruta = enSuSubdominio ? '' : `/s/${encodeURIComponent(slug)}`;
+  return `${proto}://${host}${ruta}/pedido/${encodeURIComponent(code)}`;
 }
 
 /**
- * Resuelve un cobro y lo liquida.
+ * Pedir el link de pago otra vez: rechazó la tarjeta, venció, o nunca llegó a pagar.
  *
- * En sandbox lo dispara el botón de la pantalla de pago; en producción lo dispara el
- * webhook de Mercado Pago. La liquidación —marcar el pedido pagado o imputar contra
- * el resumen— es la misma en los dos casos.
+ * Cada link nuevo da de baja el anterior en NexoPOS, así que no hace falta acordarse
+ * de ninguno.
  */
-export async function settlePaymentAction(
-  intentId: string,
-  outcome: 'aprobado' | 'rechazado',
-): Promise<{ ok: boolean; returnUrl: string }> {
-  const intent = payments.simulate
-    ? await payments.simulate(intentId, outcome)
-    : await payments.getIntent(intentId);
-
-  if (!intent) return { ok: false, returnUrl: '/' };
-
-  if (intent.status === 'aprobado') {
-    if (intent.kind === 'orden') {
-      await nexopos.confirmOrderPayment(intent.reference, intent.id);
-    } else {
-      const [storeId, accountId] = intent.reference.split('|');
-      await nexopos.registerAccountPayment({
-        storeId,
-        accountId,
-        amountCents: intent.amountCents,
-        paymentId: intent.id,
-      });
-    }
+export async function reintentarPagoAction(
+  slug: string,
+  code: string,
+): Promise<{ ok: true; checkoutUrl: string } | { ok: false; yaPagado: boolean; error: string }> {
+  const pago = await nexopos.createCheckout(code, await urlDelPedido(slug, code));
+  if (pago.ok) return { ok: true, checkoutUrl: pago.checkoutUrl };
+  if (pago.motivo === 'ya_pagado') {
+    return { ok: false, yaPagado: true, error: pago.mensaje ?? 'Este pedido ya está pagado.' };
   }
-
-  revalidatePath(intent.returnUrl);
-  return { ok: intent.status === 'aprobado', returnUrl: intent.returnUrl };
+  return {
+    ok: false,
+    yaPagado: false,
+    error:
+      pago.mensaje ??
+      (pago.motivo === 'reintentar'
+        ? 'No pudimos abrir Mercado Pago. Probá de nuevo en un momento.'
+        : 'Este pedido no se puede pagar online.'),
+  };
 }
 
 /**
@@ -158,6 +122,7 @@ export async function orderPulseAction(code: string): Promise<string | null> {
       order.paymentStatus,
       order.readyEstimate ?? '',
       order.cancelReason ?? '',
+      order.paymentError ?? '',
     ].join('|');
   } catch (e) {
     // Que la API esté caída no es noticia para el que está esperando su pizza: la

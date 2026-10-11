@@ -55,7 +55,9 @@ ClubPay antes de hacerlo.
   agotados antes de responder, y los `productCount` cuentan después de filtrar.
 - `storefrontPublished` — hay comercios que usan NexoPOS y no venden online.
 - `schedule: OpeningSlot[]` — lo que decide; `openingHours` es texto para leer.
-- `acceptedPayments` — la tienda **no infiere** medios de pago.
+- `acceptedPayments` — la tienda **no infiere** medios de pago. `online` sale **solo**
+  de `acceptsMercadoPago: true`; `acceptsOnlinePayment` viaja pero no decide nada
+  (da `true` también con contra entrega).
 
 ## Campaña
 
@@ -92,6 +94,25 @@ recibido → aceptado → listo → [en_camino] → entregado
   ananá, tengo de muzzarella" mantiene la venta; un "sin stock" del sistema la corta.
 - `expectedTotalCents` va en el alta; si el precio cambió, `priceChanged` +
   `expectedTotalCents` vuelven y la pantalla lo dice.
+- `paymentMethod: "online"` **es Mercado Pago** y nada más.
+- `paymentStatus`: `no_aplica | pendiente | pagado | rechazado | reembolsado`. **Un
+  estado desconocido no puede tirar la pantalla**: antes `reembolsado` la rompía.
+- `paymentError` — el motivo del rechazo, escrito por NexoPOS **para el comprador**.
+  Se muestra tal cual.
+- **NexoTienda nunca declara un pedido pagado.** No hay método para eso en el port.
+
+## Cobro
+
+```
+POST /v1/orders/:code/checkout   { returnUrl }   →  { checkoutUrl, expiresAt }
+```
+
+- **El importe no viaja**: lo pone NexoPOS del total. Si viajara, se podría pagar menos
+  de lo que se compró.
+- Un solo link vivo por pedido. No se guardan links.
+- 409 «ya está pagado» **no es un error**: se muestra el pedido.
+- El `returnUrl` es la URL pública completa del pedido.
+- **La URL de vuelta no es prueba de pago.** Se consulta el pedido.
 
 ## Handoff y emparejamiento
 

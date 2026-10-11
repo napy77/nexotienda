@@ -24,8 +24,10 @@ const PAYMENT_UI: Record<
     icon: Banknote,
   },
   online: {
-    label: 'Pagar ahora',
-    hint: 'Con ClubPay, tarjeta o transferencia',
+    label: 'Pagar con Mercado Pago',
+    // "Con ClubPay, tarjeta o transferencia" era falso: online es Mercado Pago y nada
+    // más, y la transferencia es otro medio que confirma el comerciante.
+    hint: 'Te llevamos a Mercado Pago y volvés acá',
     icon: CreditCard,
   },
   transferencia: {
@@ -142,7 +144,12 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
       // Antes de vaciarlo: lo que se llevó hoy es lo que va a querer la próxima vez.
       anotarComprados(store.slug, cart.lines.map((l) => l.product.id));
       cart.clear();
-      router.push(res.checkoutUrl ?? `/s/${store.slug}/pedido/${res.code}`);
+      if (res.checkoutUrl) {
+        // Mercado Pago es otro sitio: `router.push` es navegación interna y no sirve.
+        window.location.assign(res.checkoutUrl);
+      } else {
+        router.push(`/s/${store.slug}/pedido/${res.code}`);
+      }
     });
   }
 

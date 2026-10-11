@@ -17,7 +17,6 @@ desechable: se puede borrar el servidor entero y no se pierde nada.
 | Historial de compras local | `localStorage` (`nexotienda:comprados:<slug>`) | Últimos 24 productos | Por comercio |
 | Sesión de libreta | Cookie `httpOnly` `nt_lib_<slug>` | 30 días | **Por comercio** |
 | Pedido de emparejamiento | Cookie `httpOnly` `nt_par_<slug>` | 5 minutos | Por comercio |
-| Intentos de cobro (sandbox) | Memoria del proceso | Hasta reiniciar | — |
 | Pedidos (modo fixtures) | Memoria del proceso | Hasta reiniciar | — |
 
 **Nada de esto es fuente de verdad.** Si se pierde, se pierde una comodidad.

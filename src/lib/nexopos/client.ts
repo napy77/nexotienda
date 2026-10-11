@@ -61,6 +61,34 @@ const KEYS = {
 
 type Capacidad = keyof typeof KEYS;
 
+/**
+ * Un error de NexoPOS con su status y su cuerpo a mano.
+ *
+ * El mensaje sigue siendo legible en el log, pero quien necesite **decidir** según
+ * la respuesta —el 409 "ya está pagado" no se trata igual que el 409 "este comercio
+ * no cobra con Mercado Pago"— lo hace con `status` y `body`, no parseando un texto.
+ */
+export class NexoPosError extends Error {
+  constructor(
+    readonly status: number,
+    readonly path: string,
+    readonly body: string,
+  ) {
+    super(`NexoPOS respondió ${status} en ${path}${body ? ` — ${body.slice(0, 300)}` : ''}`);
+  }
+
+  /** El mensaje para el comprador, si NexoPOS mandó uno. Se muestra tal cual. */
+  get mensaje(): string | null {
+    try {
+      const j = JSON.parse(this.body);
+      const m = j?.error ?? j?.message ?? j?.mensaje;
+      return typeof m === 'string' && m.trim() ? m.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
 async function call<T>(cap: Capacidad, path: string, init?: RequestInit): Promise<T> {
   if (!BASE) throw new Error('NEXOPOS_API_URL está vacío pero se eligió el cliente HTTP.');
   if (!KEYS[cap]) {
@@ -94,9 +122,7 @@ async function call<T>(cap: Capacidad, path: string, init?: RequestInit): Promis
     // "La API de catalogo no está habilitada"— y sin él el 401 y el 503 se ven
     // iguales desde acá. Un error que no dice la causa cuesta una hora de más.
     const detalle = await res.text().catch(() => '');
-    throw new Error(
-      `NexoPOS respondió ${res.status} en ${path}${detalle ? ` — ${detalle.slice(0, 300)}` : ''}`,
-    );
+    throw new NexoPosError(res.status, path, detalle);
   }
   return (await res.json()) as T;
 }
@@ -130,7 +156,17 @@ interface StoreWire {
   showsOutOfStock?: boolean;
   slots: { id: string; label: string; kind: 'retiro' | 'reparto'; feeCents?: number }[];
   freeDeliveryOverCents?: number;
-  acceptsOnlinePayment: boolean;
+  /**
+   * **No se usa para decidir nada.** Da `true` también con contra entrega o
+   * transferencia: no dice si se puede cobrar online. Queda en el tipo porque viaja.
+   */
+  acceptsOnlinePayment?: boolean;
+  /**
+   * `true` solo si el comercio conectó Mercado Pago en ClubPay, lo autorizó para
+   * NexoPOS y NexoTienda, y lo prendió para su tienda. Si cualquiera de las tres se
+   * apaga, pasa a `false` solo. Es lo único que habilita "Pagar con Mercado Pago".
+   */
+  acceptsMercadoPago?: boolean;
   allowsCredit: boolean;
 }
 
@@ -150,7 +186,10 @@ function mapStore(w: StoreWire): Store {
    */
   const acceptedPayments: PaymentMethod[] = [
     'efectivo_entrega',
-    ...(w.acceptsOnlinePayment ? (['online'] as const) : []),
+    // Antes salía de `acceptsOnlinePayment`, que es `true` también con contra entrega:
+    // la tienda ofrecía "Pagar ahora" en comercios que no cobran online, y desde que
+    // NexoPOS contesta 409 a esos pedidos el comprador se quedaba con un error.
+    ...(w.acceptsMercadoPago === true ? (['online'] as const) : []),
     ...(w.allowsCredit ? (['cuenta_corriente'] as const) : []),
   ];
 
@@ -471,11 +510,32 @@ export const client: NexoPosPort = {
   createOrder: (order: NewOrder) =>
     pedidos<Order>('/v1/orders', { method: 'POST', body: JSON.stringify(order) }),
   getOrder: (code) => pedidos<Order | null>(`/v1/orders/${code}`),
-  confirmOrderPayment: (code, paymentId) =>
-    pedidos<Order | null>(`/v1/orders/${code}/payment`, {
-      method: 'POST',
-      body: JSON.stringify({ paymentId }),
-    }),
+
+  async createCheckout(code, returnUrl) {
+    try {
+      const r = await pedidos<{ checkoutUrl?: string; expiresAt?: string } | null>(
+        `/v1/orders/${encodeURIComponent(code)}/checkout`,
+        { method: 'POST', body: JSON.stringify({ returnUrl }) },
+      );
+      if (!r?.checkoutUrl) {
+        console.error('[nexotienda] /checkout no devolvió un link', r);
+        return { ok: false, motivo: 'reintentar', mensaje: null };
+      }
+      return { ok: true, checkoutUrl: r.checkoutUrl, expiresAt: r.expiresAt };
+    } catch (e) {
+      console.error('[nexotienda] /checkout falló', e);
+      if (e instanceof NexoPosError) {
+        // "Ya está pagado" se distingue del resto de los 409: muchas veces se pagó
+        // con un link anterior que el comprador tenía abierto, y lo que corresponde
+        // es mostrarle el pedido, no un error.
+        if (e.status === 409 && /ya est[aá] pagado/i.test(e.mensaje ?? e.body)) {
+          return { ok: false, motivo: 'ya_pagado', mensaje: e.mensaje };
+        }
+        if (e.status === 409) return { ok: false, motivo: 'no_disponible', mensaje: e.mensaje };
+      }
+      return { ok: false, motivo: 'reintentar', mensaje: null };
+    }
+  },
 
   // --- cuentas: además de la clave, piden la sesión del token de ClubPay ---
   async getAccount(storeId, accountId) {
@@ -486,16 +546,4 @@ export const client: NexoPosPort = {
   },
 
 
-  registerAccountPayment: (input) =>
-    cuentas<MerchantAccount | null>(
-      `/v1/stores/${input.storeId}/accounts/${input.accountId}/payments`,
-      {
-        method: 'POST',
-        // Importe libre: NexoPOS lo imputa del resumen más viejo al más nuevo (D31).
-        body: JSON.stringify({
-          amountCents: input.amountCents,
-          paymentId: input.paymentId,
-        }),
-      },
-    ),
 };

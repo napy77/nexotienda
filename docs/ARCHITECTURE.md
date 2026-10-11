@@ -24,7 +24,6 @@ Ver `DATABASE.md`.
   │  proxy.ts    subdominio → /s/<sub>/…    │
   │  app/        Server Components + acciones│
   │  lib/nexopos port + adapter HTTP/fixtures│
-  │  lib/payments port + sandbox/MercadoPago │
   └─────────────────────────────────────────┘
                 │ HTTPS, Bearer por capacidad
                 ▼
@@ -60,7 +59,6 @@ debe aparecer en nada que salga del repo.
 | `/s/[sub]/carrito` | Checkout |
 | `/s/[sub]/pedido/[code]` | Seguimiento del pedido |
 | `/s/[sub]/libreta` | Cuenta corriente con ese comercio |
-| `/s/[sub]/pagar/[intentId]` | Pantalla de cobro (sandbox) |
 | `/s/[sub]/entrar` (route) | Canje del token de ClubPay → abre sesión de libreta |
 | `/s/[sub]/salir` (route, POST) | Cierra la sesión de libreta de ese comercio |
 | `/s/[sub]/vincular` (route) | **Solo desarrollo.** Simula el vínculo; 404 en producción |
@@ -73,7 +71,6 @@ Ningún componente sabe cuál está activa.
 | Port | Archivo | Implementaciones | Cómo se elige |
 |---|---|---|---|
 | `NexoPosPort` | `src/lib/nexopos/types.ts` | `client.ts` (HTTP) · `fixtures.ts` | `NEXOPOS_API_URL` no vacío → HTTP |
-| `PaymentsPort` | `src/lib/payments/types.ts` | `mercadopago.ts` · `sandbox.ts` | `MP_ACCESS_TOKEN` no vacío → Mercado Pago |
 
 `src/lib/nexopos/client.ts` es además **la capa de traducción**: la API no habla
 exactamente la forma del dominio (`hours`→`schedule`, `townSlug`→`regions[]`,
@@ -128,8 +125,9 @@ Nada de esto viaja a ningún servidor salvo los ids que la estantería pide por 
 
 - **NexoPOS** (obligatoria en producción). Sin ella la app corre con fixtures.
 - **ClubPay** (indirecta, vía NexoPOS). Sin ella no hay libreta online.
-- **Mercado Pago** — `PENDIENTE DE VALIDAR`: el adapter existe pero **lanza error**;
-  falta el onboarding del comercio como vendedor.
+- **Mercado Pago**: **no se integra desde acá.** El comercio lo conecta una vez en
+  ClubPay; la tienda le pide el link a NexoPOS (`POST /v1/orders/:code/checkout`) y
+  redirige. Ninguna credencial de Mercado Pago pasa por NexoTienda.
 - Fotos de producto: URLs externas servidas por NexoPOS / Nexo B2B.
 - `lucide-react` (íconos), `motion`. Sin CDNs en runtime.
 

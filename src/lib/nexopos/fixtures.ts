@@ -295,6 +295,9 @@ const products = INITIAL_PRODUCTS.map(mapProduct);
 let seqPairing = 1;
 const pairings = new Map<string, { code: string; desde: number; token?: string }>();
 
+/** Cobros online en curso, para emular la demora de Mercado Pago en acreditar. */
+const cobros = new Map<string, { desde: number }>();
+
 const accounts: MerchantAccount[] = [
   {
     // Id de la RELACIÓN, no de la persona. En Jure Hnos. es otro distinto, y no hay
@@ -579,31 +582,45 @@ export const fixtures: NexoPosPort = {
   },
 
   async getOrder(code) {
-    return orders.get(code) ?? null;
-  },
-
-  async confirmOrderPayment(code, paymentId) {
     const order = orders.get(code);
     if (!order) return null;
-    const next = { ...order, paymentStatus: 'pagado' as const, paymentId };
-    orders.set(code, next);
-    return next;
+
+    // Mercado Pago a veces tarda unos segundos en acreditar. Se emula: el pago queda
+    // "pendiente" un rato después de volver, y después se resuelve solo.
+    const cobro = cobros.get(code);
+    if (cobro && order.paymentStatus === 'pendiente' && Date.now() - cobro.desde > 4_000) {
+      const rechazar = process.env.FIXTURES_PAGO === 'rechazar';
+      const next: Order = rechazar
+        ? {
+            ...order,
+            paymentStatus: 'rechazado',
+            paymentError: 'Tu tarjeta no tiene fondos suficientes. Probá con otra.',
+          }
+        : { ...order, paymentStatus: 'pagado', paymentError: undefined };
+      orders.set(code, next);
+      cobros.delete(code);
+      return next;
+    }
+    return order;
   },
 
-  async registerAccountPayment({ storeId, accountId, amountCents }) {
-    const account = accounts.find((a) => a.storeId === storeId && a.accountId === accountId);
-    if (!account) return null;
-
-    // Importe libre contra la cuenta (D31). **La imputación no se emula acá**: cuál
-    // resumen se cancela primero lo decide NexoPOS, que es el libro. La imputación es
-    // del libro, no de la vidriera — y la vidriera ya no muestra resúmenes.
-    account.balanceCents = Math.max(0, (account.balanceCents ?? 0) - amountCents);
-
-    // Pagar libera disponible en ESE comercio, que es el único acreedor (P1).
-    // Si no tiene límite, no hay disponible que mover.
-    if (account.availableCents !== null) {
-      account.availableCents += amountCents;
+  async createCheckout(code, returnUrl) {
+    // **Solo existe en el modo sin API**, que es todo de mentira por construcción: acá
+    // no hay un NexoPOS real al que dejarle un pago falso. Eso es lo que lo hace seguro
+    // y lo que el sandbox de antes no tenía — corría al lado de la API de verdad.
+    //
+    // No hay página de pago: se "vuelve" de Mercado Pago al instante y el pago se
+    // resuelve a los segundos (ver getOrder). Con `FIXTURES_PAGO=rechazar` se rechaza,
+    // para poder ver esa pantalla. El circuito real se prueba contra el simulador de
+    // NexoPOS.
+    const order = orders.get(code);
+    if (!order) return { ok: false, motivo: 'no_disponible', mensaje: 'Ese pedido no existe.' };
+    if (order.paymentMethod !== 'online') {
+      return { ok: false, motivo: 'no_disponible', mensaje: 'Este pedido no se paga online.' };
     }
-    return account;
+    if (order.paymentStatus === 'pagado') return { ok: false, motivo: 'ya_pagado', mensaje: 'Este pedido ya está pagado.' };
+    orders.set(code, { ...order, paymentStatus: 'pendiente', paymentError: undefined });
+    cobros.set(code, { desde: Date.now() });
+    return { ok: true, checkoutUrl: returnUrl };
   },
 };
