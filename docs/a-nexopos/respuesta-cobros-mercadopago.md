@@ -1,6 +1,7 @@
 # Cobros con Mercado Pago — NexoTienda integrado de su lado
 
-> **Para el equipo de NexoPOS.** Este archivo se manda tal cual.
+> **Para el equipo de NexoPOS.** De NexoTienda, 11 de octubre de 2026. Este archivo se
+> manda tal cual.
 >
 > Respuesta a `PARA-NEXOTIENDA_de-NEXOPOS_cobros-mercadopago.md` (CR-0002).
 
