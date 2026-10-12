@@ -85,6 +85,60 @@ sudo certbot renew --dry-run
 `diagnostico-campanas.sh` recorre la cadena —tienda, campañas, filtro, catálogo, y
 **por qué falta cada producto**— y señala la capa que falla. No imprime claves.
 
+## Probar el cobro contra el simulador de NexoPOS
+
+El cobro con Mercado Pago **no se puede probar contra producción**: ningún comercio lo
+tiene prendido hasta la prueba real de ClubPay. Se prueba levantando un NexoPOS local
+con el simulador. Requiere Postgres local y el repo de NexoPOS
+(`/Users/german/ClaudeCode/nexo-pos`).
+
+**No escribir su `backend/.env`**: existe y puede apuntar a servicios reales. Su
+backend lo carga con `dotenv`, y cualquier variable que no se pise vendría de ahí. Se
+aísla con `DOTENV_CONFIG_PATH`:
+
+```bash
+# 1. Variables de prueba en un archivo propio, con claves inventadas
+cat > /tmp/nexopos-prueba.env <<EOF
+DATABASE_URL=postgres://localhost/nexopos_prueba_tienda
+NEXOB2B_API_URL=
+CLUBPAY_API_URL=
+MERCADOPAGO_SIMULADOR=on
+PORT=4100
+NEXOPOS_PUBLIC_URL=http://localhost:4100
+NEXOTIENDA_KEY_CATALOGO=$(openssl rand -hex 16)
+NEXOTIENDA_KEY_PEDIDOS=$(openssl rand -hex 16)
+NEXOTIENDA_KEY_CUENTAS=$(openssl rand -hex 16)
+EOF
+createdb nexopos_prueba_tienda
+
+# 2. NexoPOS, solo con esas variables (las migraciones corren solas)
+cd /Users/german/ClaudeCode/nexo-pos/backend
+set -a; . /tmp/nexopos-prueba.env; set +a
+DOTENV_CONFIG_PATH=/tmp/nexopos-prueba.env npx tsx src/index.ts
+```
+
+3. Configurar el comercio de demo por su API (`demo@comercio.com` / `demo`):
+   `POST /api/auth/login`, `PUT /api/settings/tienda-slug` con un slug,
+   `PUT /api/settings/nexotienda` con `{"habilitada":true,"pagos":{"clubpay":true,"contraEntrega":true}}`,
+   y un par de productos con `POST /api/stock/producto-propio`.
+   `GET /v1/stores/<slug>` tiene que traer `acceptsMercadoPago: true`.
+
+4. NexoTienda contra ese NexoPOS, sin escribir archivos:
+
+```bash
+cd /Users/german/nexotienda
+set -a; . /tmp/nexopos-prueba.env; set +a
+NEXOPOS_API_URL=http://localhost:4100 \
+NEXOPOS_KEY_CATALOGO=$NEXOTIENDA_KEY_CATALOGO \
+NEXOPOS_KEY_PEDIDOS=$NEXOTIENDA_KEY_PEDIDOS \
+NEXOPOS_KEY_CUENTAS=$NEXOTIENDA_KEY_CUENTAS \
+npx next dev -p 3199
+```
+
+El `checkoutUrl` lleva a una página del simulador con «Pagar» y «Rechazar la
+tarjeta». Al terminar: detener los dos procesos, `dropdb nexopos_prueba_tienda` y
+borrar `/tmp/nexopos-prueba.env`.
+
 ## Rollback
 
 No hay script. A mano:

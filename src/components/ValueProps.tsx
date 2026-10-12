@@ -139,12 +139,15 @@ export function ValueProps({
       icon: Wallet,
       tono: 'border-violet-200/60 bg-violet-50 text-violet-700',
       title: 'Pagás como te quede cómodo',
+      // "online" es Mercado Pago y nada más. Decir "tarjeta" prometía algo que la
+      // tienda no ofrece por su cuenta: la tarjeta, si la hay, la elige el comprador
+      // adentro de Mercado Pago.
       text:
         otrosMedios.length === 2
-          ? 'Efectivo al recibirlo, transferencia o tarjeta.'
+          ? 'Efectivo al recibirlo, transferencia o Mercado Pago.'
           : otrosMedios[0] === 'transferencia'
             ? 'Efectivo al recibirlo o por transferencia.'
-            : 'Efectivo al recibirlo o con tarjeta.',
+            : 'Efectivo al recibirlo o con Mercado Pago.',
     });
   }
 

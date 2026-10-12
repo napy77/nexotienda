@@ -77,15 +77,28 @@ export class NexoPosError extends Error {
     super(`NexoPOS respondió ${status} en ${path}${body ? ` — ${body.slice(0, 300)}` : ''}`);
   }
 
-  /** El mensaje para el comprador, si NexoPOS mandó uno. Se muestra tal cual. */
-  get mensaje(): string | null {
+  private get json(): { error?: unknown; code?: unknown } | null {
     try {
-      const j = JSON.parse(this.body);
-      const m = j?.error ?? j?.message ?? j?.mensaje;
-      return typeof m === 'string' && m.trim() ? m.trim() : null;
+      return JSON.parse(this.body);
     } catch {
       return null;
     }
+  }
+
+  /** El mensaje para el comprador, si NexoPOS mandó uno. Se muestra tal cual. */
+  get mensaje(): string | null {
+    const m = this.json?.error;
+    return typeof m === 'string' && m.trim() ? m.trim() : null;
+  }
+
+  /**
+   * El motivo, para decidir. **Se decide por esto y nunca por el texto**: el mensaje
+   * es para el comprador y NexoPOS lo puede reescribir; el `code` es el contrato.
+   * Un error sin `code` es uno sobre el que no hay nada que decidir: se muestra.
+   */
+  get code(): string | null {
+    const c = this.json?.code;
+    return typeof c === 'string' && c ? c : null;
   }
 }
 
@@ -524,16 +537,21 @@ export const client: NexoPosPort = {
       return { ok: true, checkoutUrl: r.checkoutUrl, expiresAt: r.expiresAt };
     } catch (e) {
       console.error('[nexotienda] /checkout falló', e);
-      if (e instanceof NexoPosError) {
-        // "Ya está pagado" se distingue del resto de los 409: muchas veces se pagó
-        // con un link anterior que el comprador tenía abierto, y lo que corresponde
-        // es mostrarle el pedido, no un error.
-        if (e.status === 409 && /ya est[aá] pagado/i.test(e.mensaje ?? e.body)) {
+      if (!(e instanceof NexoPosError)) return { ok: false, motivo: 'reintentar', mensaje: null };
+
+      switch (e.code) {
+        // Muchas veces se pagó con un link anterior abierto en otra pestaña: no es un
+        // error, es mostrarle el pedido.
+        case 'ya_pagado':
           return { ok: false, motivo: 'ya_pagado', mensaje: e.mensaje };
-        }
-        if (e.status === 409) return { ok: false, motivo: 'no_disponible', mensaje: e.mensaje };
+        // No se pudo dar de baja el link anterior. Es transitorio: que reintente.
+        case 'link_anterior_vivo':
+          return { ok: false, motivo: 'reintentar', mensaje: e.mensaje };
+        // mp_no_disponible, no_es_mercadopago, pedido_cancelado, o sin `code`: no hay
+        // nada que decidir, se muestra el mensaje tal cual.
+        default:
+          return { ok: false, motivo: 'no_disponible', mensaje: e.mensaje };
       }
-      return { ok: false, motivo: 'reintentar', mensaje: null };
     }
   },
 

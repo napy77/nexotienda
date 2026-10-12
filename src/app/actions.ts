@@ -7,6 +7,7 @@ import {
   sessionCookieValue,
 } from '@/lib/session';
 import { nexopos } from '@/lib/nexopos';
+import { NexoPosError } from '@/lib/nexopos/client';
 import type { NewOrder, TownSearchHit } from '@/lib/nexopos/types';
 
 export async function searchTownAction(
@@ -21,13 +22,27 @@ export async function searchTownAction(
 
 type PlaceResult =
   | { ok: true; code: string; checkoutUrl?: string }
-  | { ok: false; error: string };
+  /**
+   * `corregible`: el comprador lo arregla ahí mismo —elegir otro medio de pago—. Lo
+   * demás es una falla que no puede resolver y necesita la salida de hablar con el
+   * comercio. Las dos se muestran distinto.
+   */
+  | { ok: false; error: string; corregible?: boolean };
 
 export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
   let order;
   try {
     order = await nexopos.createOrder(input);
   } catch (e) {
+    // El comercio apagó Mercado Pago entre que se cargó la página y el clic. No es una
+    // falla: el comprador elige otro medio y listo. El mensaje lo redacta NexoPOS.
+    if (e instanceof NexoPosError && e.code === 'mp_no_disponible') {
+      return {
+        ok: false,
+        corregible: true,
+        error: e.mensaje ?? 'Este comercio no está cobrando con Mercado Pago por ahora. Elegí otra forma de pago.',
+      };
+    }
     // El detalle va al log, no a la pantalla. "NexoPOS respondió 401 en /v1/orders"
     // no le dice nada a alguien que está comprando fideos, y encima cuenta cómo
     // está armado esto por dentro. Lo que sí sirve es que sepa que el pedido no

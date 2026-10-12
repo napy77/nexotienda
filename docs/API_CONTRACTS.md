@@ -111,6 +111,17 @@ POST /v1/orders/:code/checkout   { returnUrl }   →  { checkoutUrl, expiresAt }
   de lo que se compró.
 - Un solo link vivo por pedido. No se guardan links.
 - 409 «ya está pagado» **no es un error**: se muestra el pedido.
+- **Los errores traen `{ error, code }`. Se decide por `code`, nunca por el texto**:
+  `error` es para el comprador y NexoPOS lo puede reescribir. Un error sin `code` no
+  pide ninguna decisión: se muestra.
+
+  | `code` | Qué hace la tienda |
+  |---|---|
+  | `ya_pagado` | Muestra el pedido |
+  | `mp_no_disponible` | Al crear el pedido: error **corregible**, elegir otro medio |
+  | `no_es_mercadopago`, `pedido_cancelado` | Muestra el mensaje |
+  | `link_anterior_vivo` (502) | Que reintente |
+  | `pago_lo_confirma_mercadopago` | No debería verse: la tienda no llama a `/payment` |
 - El `returnUrl` es la URL pública completa del pedido.
 - **La URL de vuelta no es prueba de pago.** Se consulta el pedido.
 

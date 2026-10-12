@@ -29,9 +29,11 @@ pueblo de **Morrison**.
 - **Libreta**: se abre desde ClubPay (`/entrar?t=`), muestra saldo, disponible, cierre
   y vencimiento. **Se paga en ClubPay, no en la tienda.** Se cierra con "Salir".
   Revocación por `linkedAt`.
-- **Pago con Mercado Pago** vía NexoPOS (`/checkout`): construido y probado contra
-  fixtures en los tres caminos —pagado, rechazado con reintento, confirmando—. Solo se
-  ofrece con `acceptsMercadoPago: true`.
+- **Pago con Mercado Pago** vía NexoPOS (`/checkout`): **probado contra el simulador
+  de NexoPOS** (11/10) —rechazo con el motivo de NexoPOS, reintento con link nuevo,
+  pago, «ya está pagado», y el comercio apagando Mercado Pago con el checkout
+  abierto—. Solo se ofrece con `acceptsMercadoPago: true`. Se decide por `code`, nunca
+  por el texto. Procedimiento en `DEPLOYMENT.md`.
 - **Página del pueblo**: buscador de existencias, solo con los comercios que hicieron
   opt-in.
 
@@ -41,7 +43,7 @@ pueblo de **Morrison**.
 |---|---|
 | **Emparejar la libreta en otra pantalla** (PC + código) | Construido y desplegado de este lado. **NexoPOS debe apuntar a `/pos/tienda/emparejar`** (llamaba a `/pos/tienda/pairings`, un nombre inventado). ClubPay tiene su punta y la pantalla de la app sale en la próxima versión |
 | **Botón "Ir a la tienda" en ClubPay** | ClubPay necesita `storefrontSlug` y `storefrontPublished` en la ficha del comercio. **Ese dato es de Nexo B2B** y es el único que impide que un comercio nuevo tenga tienda sin carga manual |
-| **Mercado Pago contra NexoPOS real** | Falta probarlo contra el simulador de NexoPOS (pedido: una instancia de prueba). Hoy ningún comercio lo tiene prendido; la primera venta real la hace ClubPay con plata real |
+| **Mercado Pago con plata real** | Probado contra el simulador. Ningún comercio lo tiene prendido todavía: la primera venta real la hace ClubPay, con plata de verdad, cuando Germán confirme el comercio de prueba |
 | **Árbol de góndolas de 3 niveles** | Soportado; falta que NexoPOS mande el nivel del medio. Mientras tanto se derivan las hojas y la fila se corta a 12 chips |
 | **Highlights** (más vendidos / más buscados) | Consumido. "Lo más buscado" va a estar vacío hasta que se junten búsquedas |
 
@@ -83,13 +85,8 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
   comercio con `showsOutOfStock: false`. El comportamiento es correcto; el problema es
   que el comerciante no se entera. Pedido a NexoPOS. Diagnóstico:
   `deploy/diagnostico-campanas.sh <slug>`.
-- **`PENDIENTE DE VALIDAR` si hubo pagos falsos.** Hasta el 11/10 el sandbox de pagos
-  corría en producción: "Pagar ahora" y el pago de la libreta llevaban a un botón
-  "Aprobar" que marcaba pedidos (`/payment`) y libretas (`registerAccountPayment`)
-  como pagados sin plata. Se retiró entero. NexoPOS puede buscar `paymentId` con
-  prefijo `pay_sbx_`.
-- **NexoTienda no recibe webhooks.** Consulta el pedido. Confirmar que NexoPOS no esté
-  intentando entregarnos avisos.
+- **NexoTienda no recibe webhooks.** Consulta el pedido. NexoPOS confirmó que no nos
+  manda nada: los avisos quedan en su cola.
 - **`deploy/agregar-host.sh` es código muerto**: era para la lista explícita de hosts,
   anterior al certificado comodín.
 
@@ -105,6 +102,9 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
 
 ## Cambios recientes
 
+- **El sandbox de pagos corría en producción** hasta el 11/10. Hubo tres pedidos
+  marcados pagados sin plata (pruebas de septiembre, nunca entregados — Germán lo
+  confirmó). Ningún pago de libreta: ese endpoint nunca existió en NexoPOS.
 - **Cobro con Mercado Pago vía NexoPOS** (CR-0002). Se retiró `lib/payments`, el
   sandbox, la pantalla `/pagar`, el pago de la libreta y todo método que marcara algo
   como pagado. `online` sale de `acceptsMercadoPago`, no de `acceptsOnlinePayment`.

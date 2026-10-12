@@ -138,7 +138,8 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         expectedTotalCents: totalCents,
       });
       if (!res.ok) {
-        setFalla(res.error);
+        if (res.corregible) setError(res.error);
+        else setFalla(res.error);
         return;
       }
       // Antes de vaciarlo: lo que se llevó hoy es lo que va a querer la próxima vez.
