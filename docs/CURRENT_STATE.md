@@ -103,6 +103,9 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
 
 ## Cambios recientes
 
+- **`/s/<slug>` desde otro host redirige al subdominio del comercio** (13/10). La
+  página del pueblo dejaba comprar en un comercio bajo el host del pueblo: carrito y
+  sesión en el origen equivocado, y ClubPay rechazaba el `volver`.
 - **CR-0003, identidad para pagar en mano.** Una sesión es una persona identificada,
   no una libreta. Arreglado de paso: con sesión y pago al retirar no se mandaba ni
   cuenta ni contacto, y NexoPOS rechazaba el pedido con 400.

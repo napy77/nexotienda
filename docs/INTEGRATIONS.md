@@ -102,6 +102,10 @@ B2B. Ver DEC-003 en `DECISIONS.md`.
   franja, forma de pago, dirección, nombre y teléfono (`localStorage`, vence en una
   hora, se borra al mandar el pedido). En otro navegador no viaja.
 - **Vuelta** `https://<slug>.nexotienda.app/entrar?t=<token>&volver=<camino>`.
+- **ClubPay solo acepta `volver` bajo `<slug>.nexotienda.app`** (confirmado el 13/10).
+  Por eso el `proxy` redirige cualquier `/s/<slug>/…` pedido desde otro host —el del
+  pueblo, el raíz— al subdominio del comercio: si no, quien llegaba desde la página del
+  pueblo compraba bajo `morrison.nexotienda.app` y no podía volver.
   - **ClubPay necesita `storefrontSlug` y `storefrontPublished`** para armar ese link.
     Hoy falta y se carga a mano. El dueño de ese dato sería **Nexo B2B**.
 
