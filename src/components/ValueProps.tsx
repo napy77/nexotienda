@@ -87,18 +87,21 @@ export function ValueProps({
   }
 
   if (store.allowsCredit) {
+    // Entrar con ClubPay ya no es tener libreta (CR-0003): sin `creditEnabled` se
+    // muestra lo mismo que a quien no entró.
+    const libreta = account?.creditEnabled ? account : null;
     props.push({
       key: 'libreta',
       icon: BookOpenCheck,
       tono: 'border-emerald-200/60 bg-emerald-50 text-emerald-700',
-      title: account ? 'Tu libreta con este comercio' : 'Acá se puede comprar en la libreta',
-      text: !account
+      title: libreta ? 'Tu libreta con este comercio' : 'Acá se puede comprar en la libreta',
+      text: !libreta
         ? 'El fiado de siempre, anotado y a la vista. Se abre en el mostrador.'
-        : account.availableCents !== null
+        : libreta.availableCents !== null
           ? // "Disponible", nunca "tu límite" (D32). Sin límite no se muestra: "sin
             // límite" suena a premio y es solo cómo funciona el cuaderno.
-            `Disponible ${money(account.availableCents)}. Cierra el ${account.closingDay}.`
-          : `Cierra el ${account.closingDay} de cada mes.`,
+            `Disponible ${money(libreta.availableCents)}. Cierra el ${libreta.closingDay}.`
+          : `Cierra el ${libreta.closingDay} de cada mes.`,
       href: `/s/${store.slug}/libreta`,
     });
   }

@@ -52,6 +52,7 @@ arranca con datos de prueba**, que es el modo demo.
 | `NEXOPOS_KEY_CATALOGO` | Lo que la tienda le muestra a cualquiera |
 | `NEXOPOS_KEY_PEDIDOS` | Escribe pedidos; no llega a ninguna cuenta |
 | `NEXOPOS_KEY_CUENTAS` | La sensible. Además pide la sesión del token de ClubPay |
+| `CLUBPAY_WEB_URL` | Opcional. A dónde se manda a identificarse (CR-0003). Default `https://www.clubpay.com.ar`. Se lee en cada request: no hace falta recompilar |
 
 **Tres claves separadas por capacidad, no por comercio**: es un solo servidor que
 renderiza cualquier tienda. Ver DEC-003.

@@ -68,7 +68,18 @@ export default async function PedidoPage({
           <h1 className="mt-1 text-2xl font-black tracking-tight text-neutral-900">
             {STEPS[Math.max(0, currentIndex)]?.label ?? 'Tu pedido'}
           </h1>
-          {order.status === 'recibido' && (
+          {/*
+            Pedido "a revisar" (CR-0003): el comercio lo mira con más cuidado antes de
+            aceptarlo. No es un estado —sigue en `recibido`— y el motivo no se cuenta:
+            "cuenta nueva con monto alto" le dice a alguien que desconfían de él, y
+            "ClubPay no contestó" es un problema nuestro. Se dice lo que va a pasar.
+          */}
+          {order.status === 'recibido' && order.review ? (
+            <p className="mt-2 text-sm text-neutral-600">
+              {store.name} va a confirmar tu pedido antes de prepararlo. Cuando lo acepte
+              te dice para cuándo lo tiene.
+            </p>
+          ) : order.status === 'recibido' && (
             <p className="mt-2 text-sm text-neutral-600">
               Todavía no lo aceptaron. Cuando lo hagan te dicen para cuándo lo tienen.
             </p>

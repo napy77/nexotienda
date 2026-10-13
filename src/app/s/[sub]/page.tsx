@@ -185,6 +185,7 @@ export default async function SubdomainPage({ params, searchParams }: Props) {
       <LibretaBar
         store={store}
         accountName={accountName}
+        conLibreta={account?.creditEnabled ?? true}
         vencio={uno(sp.libreta) === 'vencio'}
         caduca={libreta.caduca}
       />

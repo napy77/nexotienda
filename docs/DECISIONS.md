@@ -88,7 +88,12 @@ debe salir del repo — se filtró a un equipo y costó un 404.
 
 **Motivo.** Un login propio sería una segunda identidad que tiene que coincidir con la
 de ClubPay, y el uno por ciento en que no coincidan es alguien viendo la deuda de otro.
-Además el teléfono como usuario sería la clave cross-comercio que P3 prohíbe.
+
+*Corregido el 2026-10-13 (CR-0003):* el texto original agregaba que el teléfono como
+usuario sería «la clave cross-comercio que P3 prohíbe». Era un motivo equivocado: **P3
+prohíbe exponer la deuda de un cliente a otros comercios, no identificar a la
+persona.** La conclusión no cambia; el motivo es no tener dos identidades que deban
+coincidir.
 
 **Consecuencias.** El que no tiene ClubPay sigue comprando fiado en el mostrador. Sin
 sesión no sabemos si la persona tiene libreta, así que el mensaje no lo afirma.
@@ -223,6 +228,31 @@ cobro al lado de la API real es exactamente el riesgo. Para desarrollar, la emul
 vive **dentro del adapter de fixtures**, que por construcción no convive con un NexoPOS
 real. La tienda puede juntar evidencia —el alias, a futuro el comprobante— nunca el
 veredicto.
+
+## DEC-016 — Identificarse con ClubPay para pagar en mano, y la sesión deja de ser libreta
+
+**Fecha** 2026-10-13 · **Estado** vigente · **Decidió** Germán (ADR-0002 del ecosistema, CR-0003)
+
+**Decisión.** Cada comercio puede pedir, desde NexoPOS, que quien paga al retirar o al
+recibir se identifique con ClubPay (email verificado) y ponerle topes. Viene **apagado**.
+Mercado Pago no pasa por estas reglas. Una sesión pasa a ser **una persona
+identificada**; la libreta es un permiso aparte (`creditEnabled`).
+
+**Motivo.** Un pedido falso de 50 productos a nombre de «Lando Landa». Con reparto y
+pago al recibir, un pedido así manda un cadete a la casa de alguien que no pidió nada.
+
+**Consecuencias.**
+- La tienda manda a `www.clubpay.com.ar/entrar?volver=<URL completa>` y vuelve por
+  `/entrar` con `volver`, un camino validado (nunca una URL).
+- La vidriera (`orderRules`) dice qué ofrecer; **decide el rechazo con `code`** de
+  NexoPOS. La tienda no conoce ni manda el nivel de nadie.
+- `accountId` viaja con cualquier forma de pago solo con las reglas prendidas: antes
+  NexoPOS no acepta cuenta y contacto juntos.
+- Todo pedido que no va a la libreta pide teléfono, haya sesión o no: ClubPay no se lo
+  da al comercio. Esto arregló un bug: con sesión y pago al retirar no se mandaba ni
+  cuenta ni contacto, y NexoPOS lo rechazaba.
+- Un email verificado prueba una casilla, no una persona: lo que protege al comercio
+  son sus topes y mirar las cuentas nuevas. La pantalla no dice «por tu seguridad».
 
 ---
 

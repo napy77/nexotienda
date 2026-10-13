@@ -16,11 +16,18 @@ import type { Store } from '@/lib/nexopos/types';
 export function LibretaBar({
   store,
   accountName,
+  conLibreta = true,
   vencio,
   caduca,
 }: {
   store: Store;
   accountName: string | null;
+  /**
+   * La persona se identificó, pero no tiene libreta con este comercio (CR-0003). La
+   * franja sigue haciendo falta —el teléfono de la casa sigue siendo de todos— pero
+   * no puede decir "libreta abierta" de algo que no existe.
+   */
+  conLibreta?: boolean;
   /** Volvió de ClubPay con un token que ya no servía. */
   vencio?: boolean;
   /**
@@ -61,7 +68,15 @@ export function LibretaBar({
     <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
       <BookOpenCheck className="h-4 w-4 shrink-0 text-emerald-700" />
       <p className="text-sm text-emerald-900">
-        Libreta de <span className="font-bold">{accountName}</span> abierta en {store.name}
+        {conLibreta ? (
+          <>
+            Libreta de <span className="font-bold">{accountName}</span> abierta en {store.name}
+          </>
+        ) : (
+          <>
+            Entraste como <span className="font-bold">{accountName}</span> en {store.name}
+          </>
+        )}
       </p>
       <form action={`/s/${store.slug}/salir`} method="post" className="ml-auto">
         <button

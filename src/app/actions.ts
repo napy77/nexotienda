@@ -9,6 +9,7 @@ import {
 import { nexopos } from '@/lib/nexopos';
 import { NexoPosError } from '@/lib/nexopos/client';
 import type { NewOrder, TownSearchHit } from '@/lib/nexopos/types';
+import { money } from '@/lib/format';
 
 export async function searchTownAction(
   townSlug: string,
@@ -23,11 +24,96 @@ export async function searchTownAction(
 type PlaceResult =
   | { ok: true; code: string; checkoutUrl?: string }
   /**
-   * `corregible`: el comprador lo arregla ahí mismo —elegir otro medio de pago—. Lo
-   * demás es una falla que no puede resolver y necesita la salida de hablar con el
-   * comercio. Las dos se muestran distinto.
+   * `corregible`: el comprador lo arregla ahí mismo —elegir otro medio de pago,
+   * sacar productos—. Lo demás es una falla que no puede resolver y necesita la
+   * salida de hablar con el comercio. Las dos se muestran distinto.
+   *
+   * `identificarse`: lo que lo arregla es entrar con ClubPay. La pantalla ofrece el
+   * botón al lado del mensaje.
    */
-  | { ok: false; error: string; corregible?: boolean };
+  | { ok: false; error: string; corregible?: boolean; identificarse?: boolean };
+
+/**
+ * Los rechazos del CR-0003, por `code` y nunca por el texto.
+ *
+ * Los textos nuestros no ofrecen Mercado Pago: acá no sabemos si este comercio lo
+ * toma. Eso lo agrega la pantalla, que sí lo sabe.
+ *
+ * El mensaje de NexoPOS va primero —es para el comprador y ellos lo pueden mejorar
+ * sin pedirnos nada—; el nuestro es para cuando no mandaron uno. Ninguno dice "no
+ * confiamos en vos": el comercio pide algo, y se dice qué.
+ */
+function rechazoDeReglas(e: NexoPosError): Exclude<PlaceResult, { ok: true }> | null {
+  const suyo = e.mensaje;
+  switch (e.code) {
+    case 'requiere_cuenta':
+      return {
+        ok: false,
+        corregible: true,
+        identificarse: true,
+        error:
+          suyo ??
+          'Para pagar al retirar o al recibir, este comercio pide que te identifiques con ClubPay.',
+      };
+    case 'nivel_insuficiente':
+      return {
+        ok: false,
+        corregible: true,
+        identificarse: true,
+        error:
+          suyo ??
+          'Para pagar al retirar o al recibir, este comercio pide que confirmes tu email en ClubPay.',
+      };
+    case 'excede_tope_monto': {
+      const tope = e.dato('maxTotalCents');
+      return {
+        ok: false,
+        corregible: true,
+        error:
+          suyo ??
+          (tope !== null
+            ? `Para pagar al retirar o al recibir, este comercio toma pedidos de hasta ${money(tope)}. Podés sacar algo.`
+            : 'Este pedido supera el monto que el comercio toma para pagar al retirar o al recibir. Podés sacar algo.'),
+      };
+    }
+    case 'excede_tope_productos': {
+      const tope = e.dato('maxItems');
+      return {
+        ok: false,
+        corregible: true,
+        error:
+          suyo ??
+          (tope !== null
+            ? `Para pagar al retirar o al recibir, este comercio toma pedidos de hasta ${tope} productos distintos. Podés sacar algo.`
+            : 'Este pedido tiene más productos de los que el comercio toma para pagar al retirar o al recibir. Podés sacar algo.'),
+      };
+    }
+    case 'reparto_requiere_historial':
+      return {
+        ok: false,
+        corregible: true,
+        error:
+          suyo ??
+          'Para pagar al recibir, este comercio pide que la primera vez lo retires en el local. Podés elegir retirarlo en el local.',
+      };
+    case 'libreta_no_activa':
+    case 'falta_cuenta':
+      return {
+        ok: false,
+        corregible: true,
+        error: suyo ?? 'No tenés libreta habilitada en este comercio. Elegí otra forma de pago.',
+      };
+    // Neutro a propósito: no se le cuenta a nadie que lo bloquearon. Y no es
+    // corregible: la salida es hablar con el comercio.
+    case 'cuenta_bloqueada':
+      return {
+        ok: false,
+        error: suyo ?? 'Este comercio no está tomando pedidos online de esta cuenta. Comunicate con el comercio.',
+      };
+    default:
+      return null;
+  }
+}
 
 export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
   let order;
@@ -42,6 +128,14 @@ export async function placeOrderAction(input: NewOrder): Promise<PlaceResult> {
         corregible: true,
         error: e.mensaje ?? 'Este comercio no está cobrando con Mercado Pago por ahora. Elegí otra forma de pago.',
       };
+    }
+    if (e instanceof NexoPosError) {
+      const r = rechazoDeReglas(e);
+      if (r) {
+        // Al log igual: si un comercio rechaza mucho, alguien lo va a querer saber.
+        console.warn(`[nexotienda] pedido rechazado por las reglas del comercio: ${e.code}`);
+        return r;
+      }
     }
     // El detalle va al log, no a la pantalla. "NexoPOS respondió 401 en /v1/orders"
     // no le dice nada a alguien que está comprando fideos, y encima cuenta cómo

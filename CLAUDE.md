@@ -50,7 +50,8 @@ contexto/           PDFs de negocio. NO analizar salvo pedido explícito
 7. **El precio y los totales los calcula NexoPOS.** Acá nunca se multiplica un
    descuento ni se suma una deuda.
 8. **NexoTienda nunca autentica a nadie.** Recibe una prueba de ClubPay, la canjea del
-   lado del servidor y abre una libreta. Sin contraseñas, sin usuarios propios.
+   lado del servidor y abre una sesión. Sin contraseñas, sin usuarios propios. **Una
+   sesión no es una libreta**: eso lo dice `creditEnabled` (CR-0003).
 9. **NexoTienda no llama nunca a ClubPay directo.** La cadena es
    NexoTienda → NexoPOS → ClubPay.
 10. **Español rioplatense**, concreto. No se le dice "crédito" al fiado ni "moroso" a

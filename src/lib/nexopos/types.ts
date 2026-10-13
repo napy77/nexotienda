@@ -353,6 +353,44 @@ export interface Store {
   transferHolder?: string;
   /** Da cuenta corriente en el mostrador. Distinto de habilitarla online (D34). */
   allowsCredit: boolean;
+  /**
+   * Qué le pide este comercio a quien paga al retirar o al recibir (CR-0003).
+   *
+   * **Apagado por defecto**, y ausente es apagado: hasta que el comerciante lo
+   * prenda en NexoPOS, la tienda funciona como siempre — pedidos anónimos con nombre
+   * y teléfono. Sirve para **qué ofrecer**, no para decidir: la vidriera puede estar
+   * cinco minutos vieja y el que manda es el rechazo con `code` de `POST /v1/orders`.
+   */
+  orderRules: OrderRules;
+}
+
+/**
+ * Las reglas de un comercio para el pago al retirar o al recibir.
+ *
+ * El nivel es el de la cuenta en ClubPay (1 = email verificado). NexoTienda **no
+ * conoce el nivel de nadie**: lo averigua NexoPOS al crear el pedido. Lo único que
+ * se puede decidir de este lado es lo que vale para el nivel 0 —quien no se
+ * identificó—, porque ese sí se sabe sin preguntar.
+ */
+export type OrderRules =
+  | { enabled: false }
+  | {
+      enabled: true;
+      levels: OrderRulesLevel[];
+      /** Cuántos retiros entregados hacen falta antes de pagar al recibir. */
+      deliveryCashRequiresPickups?: number;
+    };
+
+export interface OrderRulesLevel {
+  level: number;
+  /** Puede pagar al retirar. */
+  pickupCash: boolean;
+  /** Puede pagar al recibir (reparto). */
+  deliveryCash: boolean;
+  /** Ausente es sin tope. */
+  maxTotalCents?: number;
+  /** Renglones, no unidades. Ausente es sin tope. */
+  maxItems?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -503,18 +541,28 @@ export interface MerchantAccount {
   currentPeriod?: { from: string; to: string; dueDate?: string };
   /** Ver `LinkSession.linkedAt`. Se mueve cuando el vínculo cambia, no al consultar. */
   linkedAt?: string;
-  /** La pila. Del más viejo al más nuevo (D28, D30). */
+  /**
+   * Si esta persona tiene libreta con este comercio (CR-0003).
+   *
+   * **Una sesión ya no es una libreta.** Desde que se puede entrar con ClubPay para
+   * pagar al retirar, la sesión dice "esta persona se identificó acá"; la libreta es
+   * un permiso aparte que da el comerciante en el mostrador. Con `false` no se ofrece
+   * anotar nada en la cuenta.
+   */
+  creditEnabled: boolean;
 }
 
 /**
  * Por qué la opción de comprar en la libreta está grisada.
  *
- * Son cuatro situaciones distintas y cada una merece su mensaje: no es lo mismo no
+ * Son situaciones distintas y cada una merece su mensaje: no es lo mismo no
  * tener cuenta que tenerla pausada. Y en ningún caso se esconde el botón — se
  * explica, con la puerta al humano al lado (D36).
  */
 export type CreditBlockReason =
   | 'sin_cuenta'
+  /** Se identificó, pero el comercio no le abrió libreta. */
+  | 'sin_libreta'
   | 'solo_mostrador'
   | 'pausada'
   | 'sin_disponible';
@@ -629,6 +677,15 @@ export interface Order {
    */
   priceChanged?: boolean;
   expectedTotalCents?: number;
+  /**
+   * El comercio lo va a mirar antes de prepararlo (CR-0003).
+   *
+   * **No es un estado**: el pedido está en `recibido` como cualquier otro, y ninguno
+   * se arma sin que el comerciante lo acepte. Es el motivo por el que este en
+   * particular lo va a mirar con más cuidado — cuenta nueva con un monto alto, o
+   * ClubPay que no contestó—. Al comprador no se le cuenta el motivo.
+   */
+  review?: { reason: string };
 }
 
 export interface NewOrder {
@@ -639,11 +696,18 @@ export interface NewOrder {
   paymentMethod: PaymentMethod;
   notes?: string;
   /**
-   * Solo cuando la compra va a la libreta. El camino normal es anónimo: alguien
-   * entra, compra dos paquetes de harina y paga al recibirlos.
+   * Quién compra, cuando se identificó con ClubPay. El camino normal es anónimo:
+   * alguien entra, compra dos paquetes de harina y paga al recibirlos.
+   *
+   * Con la libreta va siempre. Con las demás formas de pago va solo si el comercio
+   * prendió las reglas del CR-0003: antes de eso NexoPOS no acepta `accountId` y
+   * `contact` juntos.
    */
   accountId?: string;
-  /** Para poder avisarle del pedido a quien compró sin cuenta. */
+  /**
+   * Para poder avisarle del pedido. Obligatorio en todo pedido que no vaya a la
+   * libreta, **aunque haya sesión**: ClubPay no le da el teléfono al comercio.
+   */
   contact?: { name: string; phone: string };
   /**
    * El total que la pantalla le mostró al comprador cuando apretó el botón.

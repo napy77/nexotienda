@@ -55,6 +55,10 @@ ClubPay antes de hacerlo.
   agotados antes de responder, y los `productCount` cuentan después de filtrar.
 - `storefrontPublished` — hay comercios que usan NexoPOS y no venden online.
 - `schedule: OpeningSlot[]` — lo que decide; `openingHours` es texto para leer.
+- `orderRules` (CR-0003) — `{ enabled: false }` o ausente es **apagado**, y cualquier
+  forma rara también. Con `enabled: true`, `levels[]` dice por nivel si se puede pagar
+  al retirar (`pickupCash`) o al recibir (`deliveryCash`) y los topes. La tienda solo
+  lee el nivel 0 (quien no se identificó); **el rechazo con `code` manda**.
 - `acceptedPayments` — la tienda **no infiere** medios de pago. `online` sale **solo**
   de `acceptsMercadoPago: true`; `acceptsOnlinePayment` viaja pero no decide nada
   (da `true` también con contra entrega).
@@ -75,6 +79,8 @@ ClubPay antes de hacerlo.
   afuera el período abierto.
 - `creditPaused` / `onlineCreditEnabled` — **dos cosas distintas** y se cuentan
   distinto: "hablá con el comercio" vs "este comercio no toma libreta online".
+- `creditEnabled` (CR-0003) — **una sesión no es una libreta.** `false`: se identificó
+  pero no tiene libreta con ese comercio; no se ofrece anotar. Ausente es `true`.
 - `linkedAt` — se mueve cuando el vínculo cambia, **no en una consulta de rutina**. Si
   se moviera al consultar, cerraría la sesión de todo el mundo cada pocos minutos.
 - `closingDay` / `dueDay` — opcionales. Si no vienen, no se muestran.
@@ -95,6 +101,16 @@ recibido → aceptado → listo → [en_camino] → entregado
 - `expectedTotalCents` va en el alta; si el precio cambió, `priceChanged` +
   `expectedTotalCents` vuelven y la pantalla lo dice.
 - `paymentMethod: "online"` **es Mercado Pago** y nada más.
+- `accountId` + `contact`: con la libreta va solo `accountId`. Con lo demás va
+  `contact` siempre, y `accountId` solo si `orderRules.enabled` (antes son excluyentes
+  en NexoPOS). **El nivel no se manda.**
+- Rechazos del CR-0003, 409 con `{ error, code }`: `requiere_cuenta` y
+  `nivel_insuficiente` (ofrecer identificarse), `excede_tope_monto` (`maxTotalCents`),
+  `excede_tope_productos` (`maxItems`), `reparto_requiere_historial`,
+  `libreta_no_activa`, `cuenta_bloqueada` (mensaje neutro, nunca decir «bloqueada»).
+  `falta_cuenta` es 400. Sin el dato extra, el texto va sin número.
+- `review: { reason }` — el comercio lo mira antes de aceptarlo. **No es un estado**:
+  sigue en `recibido`. El motivo no se le muestra al comprador.
 - `paymentStatus`: `no_aplica | pendiente | pagado | rechazado | reembolsado`. **Un
   estado desconocido no puede tirar la pantalla**: antes `reembolsado` la rompía.
 - `paymentError` — el motivo del rechazo, escrito por NexoPOS **para el comprador**.

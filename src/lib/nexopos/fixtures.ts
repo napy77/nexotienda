@@ -17,6 +17,7 @@ import type {
   NewOrder,
   NexoPosPort,
   Order,
+  OrderRules,
   Pasillo,
   Product,
   Region,
@@ -24,8 +25,31 @@ import type {
   TownSearchResult,
 } from './types';
 import { arbolDe, productosDe } from '@/lib/arbol';
+import { NexoPosError } from './client';
 
 const TOWN = { slug: 'morrison', name: 'Morrison' };
+
+/**
+ * Las reglas del CR-0003, apagadas como en cualquier comercio real hasta que el
+ * comerciante las prenda. Con `FIXTURES_REGLAS=on` se prenden en todos, con los
+ * números del ejemplo del CR, para poder ver la redirección a ClubPay y los rechazos.
+ */
+const REGLAS: OrderRules =
+  process.env.FIXTURES_REGLAS === 'on'
+    ? {
+        enabled: true,
+        levels: [
+          { level: 0, pickupCash: false, deliveryCash: false },
+          { level: 1, pickupCash: true, deliveryCash: true, maxTotalCents: 4_500_000, maxItems: 25 },
+        ],
+        deliveryCashRequiresPickups: 1,
+      }
+    : { enabled: false };
+
+/** Un rechazo con la misma forma que los de NexoPOS: `{ error, code, …datos }`. */
+function rechazo(status: number, cuerpo: Record<string, unknown>): never {
+  throw new NexoPosError(status, '/v1/orders', JSON.stringify(cuerpo));
+}
 
 /** El slug lo asigna un humano en el admin de Nexo B2B: los nombres se repiten. */
 const REGION: Region = {
@@ -255,6 +279,7 @@ function mapStore(s: (typeof STORES_MORRISON)[number]): Store {
     transferAlias: `${SLUGS[s.id] ?? s.id}.morrison.mp`,
     transferHolder: s.name,
     allowsCredit: s.allowsCredit,
+    orderRules: REGLAS,
   };
 }
 
@@ -280,6 +305,7 @@ const jureHnos: Store = {
   // Sin Mercado Pago: la libreta sigue funcionando, solo se cae el pago online.
   acceptedPayments: ['efectivo_entrega', 'cuenta_corriente'],
   allowsCredit: true,
+  orderRules: REGLAS,
 };
 
 const stores = [...STORES_MORRISON.map(mapStore), jureHnos];
@@ -315,6 +341,9 @@ const accounts: MerchantAccount[] = [
     currentPeriod: { from: '2026-09-11', to: '2026-10-10', dueDate: '2026-10-20' },
     creditPaused: false,
     onlineCreditEnabled: true,
+    // Con `FIXTURES_SIN_LIBRETA=on`, la persona se identificó pero el comercio no le
+    // abrió libreta: el caso nuevo del CR-0003.
+    creditEnabled: process.env.FIXTURES_SIN_LIBRETA !== 'on',
   },
   {
     accountId: 'acc_jure_7d20',
@@ -327,6 +356,7 @@ const accounts: MerchantAccount[] = [
     creditPaused: false,
     // Arranca apagado: toma la libreta solo en el mostrador (D34).
     onlineCreditEnabled: false,
+    creditEnabled: true,
   },
 ];
 
@@ -545,6 +575,47 @@ export const fixtures: NexoPosPort = {
     const feeCents = slot.kind === 'reparto' && !free ? (slot.feeCents ?? 0) : 0;
 
     const totalCents = subtotalCents + feeCents;
+
+    // Lo mismo que valida NexoPOS. Antes del CR-0003, cuenta y contacto eran
+    // excluyentes; con las reglas prendidas pueden ir juntos.
+    if (input.accountId && input.contact && !store.orderRules.enabled) {
+      rechazo(400, { error: 'Un pedido va con cuenta corriente o con contacto, no con los dos.' });
+    }
+    if (input.paymentMethod === 'cuenta_corriente') {
+      if (!input.accountId) {
+        rechazo(400, { error: 'Para comprar a la cuenta corriente hay que entrar con la cuenta.', code: 'falta_cuenta' });
+      }
+      const cuenta = accounts.find((a) => a.accountId === input.accountId);
+      if (cuenta && !cuenta.creditEnabled) {
+        rechazo(409, { error: 'No tenés libreta habilitada en este comercio.', code: 'libreta_no_activa' });
+      }
+    }
+    if (store.orderRules.enabled && input.paymentMethod === 'efectivo_entrega') {
+      if (!input.accountId) {
+        rechazo(409, {
+          error: 'Para pagar al retirar o al recibir, este comercio pide que te identifiques con ClubPay.',
+          code: 'requiere_cuenta',
+          requiredLevel: 1,
+        });
+      }
+      // En fixtures toda cuenta es nivel 1.
+      const nivel = store.orderRules.levels.find((l) => l.level === 1);
+      if (nivel?.maxTotalCents !== undefined && totalCents > nivel.maxTotalCents) {
+        rechazo(409, {
+          error: 'Este pedido supera el monto que el comercio toma para pagar al retirar.',
+          code: 'excede_tope_monto',
+          maxTotalCents: nivel.maxTotalCents,
+        });
+      }
+      if (nivel?.maxItems !== undefined && lines.length > nivel.maxItems) {
+        rechazo(409, {
+          error: 'Este pedido tiene más productos de los que el comercio toma para pagar al retirar.',
+          code: 'excede_tope_productos',
+          maxItems: nivel.maxItems,
+        });
+      }
+    }
+
     // Igual que NexoPOS: el total que vale es el de acá, pero si no coincide con el
     // que el comprador tenía en pantalla, se avisa en vez de corregir en silencio.
     const priceChanged =
@@ -576,6 +647,11 @@ export const fixtures: NexoPosPort = {
       // Nace en 'recibido'. Que el comercio se entere no es que haya aceptado (D18).
       status: 'recibido',
       createdAt: new Date().toISOString(),
+      // Cuenta nueva con un monto alto: el comercio lo mira antes de prepararlo.
+      review:
+        store.orderRules.enabled && input.accountId && totalCents > 2_000_000
+          ? { reason: 'cuenta_nueva_monto_alto' }
+          : undefined,
     };
     orders.set(code, order);
     return order;

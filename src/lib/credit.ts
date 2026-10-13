@@ -41,6 +41,20 @@ export function creditState(
     };
   }
 
+  /*
+    Se identificó con ClubPay, pero el comercio no le abrió libreta (CR-0003). No es
+    lo mismo que no tener sesión: acá sí sabemos que no la tiene, y lo que corresponde
+    es decir dónde se consigue, no mandarlo a entrar de nuevo.
+  */
+  if (!account.creditEnabled) {
+    return {
+      ok: false,
+      reason: 'sin_libreta',
+      message: `La libreta con ${store.name} se abre en el mostrador, hablando con ellos.`,
+      offerContact: true,
+    };
+  }
+
   if (account.creditPaused) {
     return {
       ok: false,

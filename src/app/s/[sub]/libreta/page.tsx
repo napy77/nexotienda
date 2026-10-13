@@ -67,6 +67,36 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
 
   const debe = account.balanceCents;
 
+  /*
+    Se identificó con ClubPay pero no tiene libreta con este comercio (CR-0003). Se
+    dice lo que hay —entraste, no tenés libreta acá— y dónde se consigue. Nada de
+    "anotar en la cuenta".
+
+    Con deuda es otra cosa: el comerciante puede cerrarle la libreta a alguien que
+    todavía le debe, y cerrarla no borra la deuda. Ahí la pantalla sigue mostrando
+    cuánto se debe y cómo se paga, que es verdad, y solo se esconde el disponible.
+  */
+  if (!account.creditEnabled && !(debe !== undefined && debe > 0)) {
+    return (
+      <StoreShell store={store}>
+        <LibretaBar store={store} accountName={displayName} conLibreta={false} />
+        <div className="mx-auto max-w-lg rounded-xl border border-neutral-200 bg-white p-8 text-center">
+          <BookMarked className="mx-auto h-8 w-8 text-neutral-300" />
+          <p className="mt-3 text-sm font-semibold text-neutral-800">
+            Todavía no tenés libreta con {store.name}
+          </p>
+          <p className="mt-1 text-sm text-neutral-500">
+            Se abre en el mostrador, hablando con ellos. Mientras tanto podés comprar
+            pagando de otra forma.
+          </p>
+          <div className="mt-5 flex justify-center">
+            <ContactButton store={store} />
+          </div>
+        </div>
+      </StoreShell>
+    );
+  }
+
   return (
     <StoreShell store={store}>
       {/*
@@ -74,7 +104,7 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
         alguien en el teléfono de la casa sin ninguna forma de cerrarla desde la misma
         pantalla donde estaba a la vista.
       */}
-      <LibretaBar store={store} accountName={displayName} />
+      <LibretaBar store={store} accountName={displayName} conLibreta={account.creditEnabled} />
 
       <h1 className="mb-1 text-2xl font-black tracking-tight text-neutral-900">
         Tu libreta con {store.name}
@@ -124,7 +154,7 @@ export default async function LibretaPage({ params }: { params: Promise<{ sub: s
         de disponible. Ponerle "$0" sería exactamente al revés de la verdad, y decir
         "sin límite" suena a premio cuando es solo cómo funciona el cuaderno (D32).
       */}
-      {account.availableCents !== null && (
+      {account.creditEnabled && account.availableCents !== null && (
         <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
           <p className="text-xs font-bold tracking-wider text-emerald-800 uppercase">
             Disponible para comprar

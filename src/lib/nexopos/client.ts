@@ -42,6 +42,8 @@ import type {
   NexoPosPort,
   OpeningSlot,
   Order,
+  OrderRules,
+  OrderRulesLevel,
   Pasillo,
   PaymentMethod,
   Product,
@@ -77,7 +79,7 @@ export class NexoPosError extends Error {
     super(`NexoPOS respondió ${status} en ${path}${body ? ` — ${body.slice(0, 300)}` : ''}`);
   }
 
-  private get json(): { error?: unknown; code?: unknown } | null {
+  private get json(): Record<string, unknown> | null {
     try {
       return JSON.parse(this.body);
     } catch {
@@ -99,6 +101,15 @@ export class NexoPosError extends Error {
   get code(): string | null {
     const c = this.json?.code;
     return typeof c === 'string' && c ? c : null;
+  }
+
+  /**
+   * Un dato numérico que viaja con el rechazo —`maxTotalCents`, `requiredLevel`…—
+   * para que la tienda arme su propio texto. Si no vino, `null`: no se inventa (P6).
+   */
+  dato(campo: string): number | null {
+    const v = this.json?.[campo];
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
   }
 }
 
@@ -181,6 +192,39 @@ interface StoreWire {
    */
   acceptsMercadoPago?: boolean;
   allowsCredit: boolean;
+  /** CR-0003. Ausente es apagado. Ver `leerReglas`. */
+  orderRules?: unknown;
+}
+
+/**
+ * Las reglas del CR-0003, leídas con desconfianza.
+ *
+ * Ante cualquier forma que no se entienda, **apagado**: es exactamente lo que había
+ * antes de que existieran, y el rechazo con `code` de NexoPOS sigue protegiendo al
+ * comercio. Al revés —tratar algo raro como prendido— cerraría el pago al retirar en
+ * una tienda por un campo mal escrito.
+ */
+function leerReglas(raw: unknown): OrderRules {
+  if (!raw || typeof raw !== 'object') return { enabled: false };
+  const r = raw as { enabled?: unknown; levels?: unknown; deliveryCashRequiresPickups?: unknown };
+  if (r.enabled !== true || !Array.isArray(r.levels)) return { enabled: false };
+
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const levels: OrderRulesLevel[] = r.levels
+    .filter((l): l is Record<string, unknown> => !!l && typeof l === 'object')
+    .filter((l) => typeof l.level === 'number')
+    .map((l) => ({
+      level: l.level as number,
+      pickupCash: l.pickupCash === true,
+      deliveryCash: l.deliveryCash === true,
+      maxTotalCents: num(l.maxTotalCents),
+      maxItems: num(l.maxItems),
+    }));
+  return {
+    enabled: true,
+    levels,
+    deliveryCashRequiresPickups: num(r.deliveryCashRequiresPickups),
+  };
 }
 
 function mapStore(w: StoreWire): Store {
@@ -232,6 +276,7 @@ function mapStore(w: StoreWire): Store {
     freeDeliveryOverCents: w.freeDeliveryOverCents,
     acceptedPayments,
     allowsCredit: w.allowsCredit,
+    orderRules: leerReglas(w.orderRules),
   };
 }
 
@@ -296,6 +341,7 @@ interface AccountWire {
   dueDay?: number;
   currentPeriod?: { from: string; to: string; dueDate?: string };
   linkedAt?: string;
+  creditEnabled?: boolean;
 }
 
 function mapAccount(w: AccountWire): MerchantAccount {
@@ -316,6 +362,10 @@ function mapAccount(w: AccountWire): MerchantAccount {
     creditPaused: w.creditPaused ?? w.paused ?? false,
     onlineCreditEnabled: w.onlineCreditEnabled ?? w.onlineEnabled ?? false,
     linkedAt: w.linkedAt,
+    // Ausente es `true`: hasta el CR-0003 toda cuenta canjeable era una libreta
+    // abierta en el mostrador, y una versión de NexoPOS sin el campo no puede
+    // apagarle la libreta a nadie.
+    creditEnabled: w.creditEnabled ?? true,
   };
 }
 

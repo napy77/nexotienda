@@ -85,6 +85,23 @@ B2B. Ver DEC-003 en `DECISIONS.md`.
     ajenos y el navegador les contaría el token.
   - `ir` es **una llave de una lista fija**, nunca una URL. Aceptar una URL sería un
     redirector abierto con la marca de la tienda.
+  - `volver` (CR-0003) es la excepción: lo trae quien salió del checkout a
+    identificarse. Es un **camino** dentro de la tienda, validado en
+    `lib/identidad.ts` (`/` adelante, no `//` ni `\`, sin control, mismo host al
+    resolverlo, no `/entrar`). Si no pasa, se ignora. Gana sobre `ir`.
+  - **Una sesión es una persona identificada, no una libreta**: eso lo dice
+    `creditEnabled` en la cuenta.
+
+## 5 bis. NexoTienda → ClubPay (navegador) · identificarse para pagar en mano
+
+- **Cuándo** con `orderRules.enabled`, sin sesión y pago al retirar/recibir que el
+  nivel 0 no permite (o NexoPOS contestó `requiere_cuenta`/`nivel_insuficiente`).
+- **Cómo** `window.location.assign` a `${CLUBPAY_WEB_URL}/entrar?volver=<URL completa
+  del carrito>`. Es una navegación del comprador, **no una llamada nuestra a ClubPay**.
+- **Lo que se conserva** el carrito (`localStorage`, de siempre) y un borrador con
+  franja, forma de pago, dirección, nombre y teléfono (`localStorage`, vence en una
+  hora, se borra al mandar el pedido). En otro navegador no viaja.
+- **Vuelta** `https://<slug>.nexotienda.app/entrar?t=<token>&volver=<camino>`.
   - **ClubPay necesita `storefrontSlug` y `storefrontPublished`** para armar ese link.
     Hoy falta y se carga a mano. El dueño de ese dato sería **Nexo B2B**.
 

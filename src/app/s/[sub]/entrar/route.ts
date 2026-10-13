@@ -1,13 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { nexopos } from '@/lib/nexopos';
 import { sessionCookieName, sessionCookieOptions, sessionCookieValue } from '@/lib/session';
+import { volverSeguro } from '@/lib/identidad';
 
 /**
  * El canje del handoff: `jure.nexotienda.app/entrar?t=…`
  *
- * La persona tocó "Ir a la tienda" en ClubPay. ClubPay emitió un token de un solo
- * uso y dos minutos, atado a **esa relación** —esa persona en ese comercio— y nos
- * mandó acá. Lo canjeamos del lado del servidor y abrimos la libreta.
+ * La persona tocó "Ir a la tienda" en ClubPay, o fue a identificarse desde el
+ * checkout para pagar al retirar (CR-0003). ClubPay emitió un token de un solo uso y
+ * dos minutos, atado a **esa relación** —esa persona en ese comercio— y nos mandó
+ * acá. Lo canjeamos del lado del servidor y abrimos la sesión. **Una sesión ya no es
+ * una libreta**: es una persona identificada; la libreta es un permiso aparte que
+ * dice `creditEnabled`.
  *
  * Cuatro cosas que no son obvias:
  *
@@ -39,6 +43,11 @@ import { sessionCookieName, sessionCookieOptions, sessionCookieValue } from '@/l
  * único que cambia es dónde termina.
  *
  * Es una lista fija a propósito. Ver arriba.
+ *
+ * La excepción es `volver`, que trae la persona que salió del checkout a
+ * identificarse: ahí la vuelta tiene que ser a la pantalla de donde se fue. No es
+ * una URL sino un camino dentro de esta tienda, y pasa por `volverSeguro` — si no
+ * convence, se ignora. Gana sobre `ir` porque es más específico.
  */
 const DESTINOS: Record<string, string> = {
   tienda: '/',
@@ -49,9 +58,11 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ sub: st
   const host = request.headers.get('host') ?? request.nextUrl.host;
   const raiz = new URL(`${request.nextUrl.protocol}//${host}/`);
   // Ausente o desconocido cae en la tienda, que es el destino que siempre sirve.
-  const destino = new URL(
-    `${request.nextUrl.protocol}//${host}${DESTINOS[request.nextUrl.searchParams.get('ir') ?? ''] ?? '/'}`,
-  );
+  const camino =
+    volverSeguro(request.nextUrl.searchParams.get('volver')) ??
+    DESTINOS[request.nextUrl.searchParams.get('ir') ?? ''] ??
+    '/';
+  const destino = new URL(`${request.nextUrl.protocol}//${host}${camino}`);
 
   function irA(url: URL) {
     const res = NextResponse.redirect(url);

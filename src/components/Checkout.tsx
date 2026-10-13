@@ -3,12 +3,24 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Banknote, BookMarked, Clock, CreditCard, Landmark, Minus, Moon, Plus, Trash2 } from 'lucide-react';
+import {
+  Banknote,
+  BookMarked,
+  Clock,
+  CreditCard,
+  Landmark,
+  Minus,
+  Moon,
+  Plus,
+  Trash2,
+  UserCheck,
+} from 'lucide-react';
 import { money } from '@/lib/format';
 import { creditState } from '@/lib/credit';
 import { anotarComprados } from '@/lib/historial';
 import { openState, type OpenState } from '@/lib/horario';
 import { closedPolicy } from '@/lib/cerrado';
+import { pideIdentificarse, urlIdentificarse } from '@/lib/identidad';
 import type { MerchantAccount, PaymentMethod, Store } from '@/lib/nexopos/types';
 import { placeOrderAction } from '@/app/actions';
 import { useCart } from './CartProvider';
@@ -42,13 +54,63 @@ const PAYMENT_UI: Record<
   },
 };
 
-export function Checkout({ store, account }: { store: Store; account: MerchantAccount | null }) {
+/**
+ * Lo que la persona ya había cargado, guardado mientras va a identificarse a ClubPay.
+ *
+ * El carrito ya sobrevive solo (vive en `localStorage`), pero la franja, la dirección
+ * y el teléfono no: volver de hacerse una cuenta y encontrar el formulario en blanco
+ * es la forma más segura de que no termine el pedido. Va a `localStorage` y no a
+ * `sessionStorage` porque el email de verificación se abre muchas veces en otra
+ * pestaña. Vence en una hora y se borra al mandar el pedido: es el teléfono de
+ * alguien, en su propio navegador, y no tiene por qué quedarse ahí.
+ */
+const BORRADOR_VIDA = 60 * 60_000;
+type Borrador = {
+  slotId: string;
+  payment: PaymentMethod;
+  address: string;
+  name: string;
+  phone: string;
+  t: number;
+};
+
+function leerBorrador(key: string): Borrador | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const b = JSON.parse(raw) as Borrador;
+    if (typeof b?.t !== 'number' || Date.now() - b.t > BORRADOR_VIDA) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    return b;
+  } catch {
+    return null;
+  }
+}
+
+export function Checkout({
+  store,
+  account,
+  clubpayWeb,
+}: {
+  store: Store;
+  account: MerchantAccount | null;
+  /** La web de ClubPay, para mandar a identificarse. Ver `lib/identidad.ts`. */
+  clubpayWeb: string;
+}) {
   const cart = useCart();
   const router = useRouter();
   const [slotId, setSlotId] = useState(store.slots[0]?.id ?? 'retiro');
   const [address, setAddress] = useState('');
-  const [name, setName] = useState('');
+  // Con sesión, el nombre sale de la cuenta y se puede cambiar: es a quién busca el
+  // comercio cuando lo va a retirar. El teléfono se pide igual (ver abajo).
+  const [name, setName] = useState(account?.displayName ?? '');
   const [phone, setPhone] = useState('');
+  // NexoPOS contestó que este pedido necesita una cuenta. La vidriera puede estar
+  // vieja y no haberlo dicho: el rechazo manda.
+  const [pideEntrar, setPideEntrar] = useState(false);
+  const borradorKey = `nexotienda:borrador:${store.slug}`;
   // Dos cosas distintas y no se muestran igual: `error` es algo que el comprador
   // puede arreglar acá mismo —falta la dirección, falta el teléfono— y `falla` es
   // que el pedido no se pudo mandar, que él no puede resolver y necesita salida.
@@ -90,6 +152,43 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
   const [payment, setPayment] = useState<PaymentMethod>(methods[0] ?? 'efectivo_entrega');
   const showCredit = store.acceptedPayments.includes('cuenta_corriente');
 
+  // Volvió de ClubPay: se deja todo como estaba. Lo del borrador gana sobre los
+  // defaults, salvo el nombre si ahora hay cuenta y no había escrito ninguno.
+  useEffect(() => {
+    const b = leerBorrador(borradorKey);
+    if (!b) return;
+    if (store.slots.some((s) => s.id === b.slotId)) setSlotId(b.slotId);
+    if (store.acceptedPayments.includes(b.payment)) setPayment(b.payment);
+    setAddress(b.address);
+    if (b.name) setName(b.name);
+    setPhone(b.phone);
+  }, [borradorKey, store]);
+
+  /*
+    Con las reglas del CR-0003 prendidas, quien no se identificó puede no poder pagar
+    en mano. Se sabe antes de apretar nada —para el nivel 0 no hay que preguntarle a
+    nadie— y se dice ahí mismo, al lado de la forma de pago. Con sesión no se
+    adelanta nada: el nivel lo sabe NexoPOS, y si no alcanza, lo dice su rechazo.
+  */
+  const hayQueEntrar =
+    !account &&
+    payment === 'efectivo_entrega' &&
+    (pideEntrar || pideIdentificarse(store.orderRules, slot?.kind ?? 'retiro'));
+  const tomaMercadoPago = methods.includes('online');
+
+  function irAIdentificarse() {
+    try {
+      const b: Borrador = { slotId, payment, address, name, phone, t: Date.now() };
+      window.localStorage.setItem(borradorKey, JSON.stringify(b));
+    } catch {
+      // Sin almacenamiento se va igual: perder la franja es menos grave que no poder
+      // identificarse.
+    }
+    // La URL completa de esta pantalla. ClubPay la reduce al camino y la devuelve.
+    const volver = `${window.location.origin}${window.location.pathname}`;
+    window.location.assign(urlIdentificarse(clubpayWeb, volver));
+  }
+
   if (cart.ready && cart.lines.length === 0) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center">
@@ -110,6 +209,12 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
     // Pasa por acá aunque el botón esté deshabilitado: el carrito puede haber
     // cambiado, o el comercio haber cerrado, entre que se pintó la pantalla y el clic.
     if (cierre.kind === 'bloqueado') return;
+    // Antes que la confirmación de "está cerrado": ese sí se pregunta a la vuelta,
+    // con el pedido ya listo para salir.
+    if (hayQueEntrar) {
+      irAIdentificarse();
+      return;
+    }
     if (cierre.kind === 'confirmar' && !yaConfirmo) {
       setConfirmando(true);
       return;
@@ -118,8 +223,11 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
       setError('Necesitamos la dirección para llevártelo.');
       return;
     }
-    // Sin cuenta no sabemos quién sos, y el comercio necesita poder avisarte.
-    if (!account && (name.trim().length < 2 || phone.trim().length < 6)) {
+    // El comercio necesita poder avisarte, **también con sesión**: ClubPay no le da
+    // el teléfono a nadie. Solo la libreta no lo pide, porque el comercio ya te tiene
+    // en su ficha.
+    const vaALaLibreta = payment === 'cuenta_corriente';
+    if (!vaALaLibreta && (name.trim().length < 2 || phone.trim().length < 6)) {
       setError('Dejanos tu nombre y un teléfono para poder avisarte.');
       return;
     }
@@ -131,13 +239,22 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
         slotId,
         address: slot?.kind === 'reparto' ? address.trim() : undefined,
         paymentMethod: payment,
-        accountId: payment === 'cuenta_corriente' ? account?.accountId : undefined,
-        contact: account ? undefined : { name: name.trim(), phone: phone.trim() },
+        /*
+          Quién compra. Con la libreta va siempre. Con lo demás, solo si el comercio
+          prendió las reglas: ahí NexoPOS lo necesita para saber el nivel, y es
+          también lo que garantiza que ya entiende cuenta y contacto juntos — antes
+          del CR-0003 eran excluyentes y el pedido rebotaba. El nivel no se manda:
+          lo averigua NexoPOS.
+        */
+        accountId:
+          account && (vaALaLibreta || store.orderRules.enabled) ? account.accountId : undefined,
+        contact: vaALaLibreta ? undefined : { name: name.trim(), phone: phone.trim() },
         // Lo que esta pantalla le mostró recién. No es para cobrar —eso lo calcula
         // NexoPOS— sino para que pueda avisar si no coincide.
         expectedTotalCents: totalCents,
       });
       if (!res.ok) {
+        if (res.identificarse && !account) setPideEntrar(true);
         if (res.corregible) setError(res.error);
         else setFalla(res.error);
         return;
@@ -145,6 +262,9 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
       // Antes de vaciarlo: lo que se llevó hoy es lo que va a querer la próxima vez.
       anotarComprados(store.slug, cart.lines.map((l) => l.product.id));
       cart.clear();
+      try {
+        window.localStorage.removeItem(borradorKey);
+      } catch {}
       if (res.checkoutUrl) {
         // Mercado Pago es otro sitio: `router.push` es navegación interna y no sirve.
         window.location.assign(res.checkoutUrl);
@@ -282,9 +402,11 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
           )}
         </div>
 
-        {!account && (
+        {payment !== 'cuenta_corriente' && !hayQueEntrar && (
           <div className="rounded-xl border border-neutral-200 bg-white p-4">
-            <h2 className="mb-1 text-sm font-bold text-neutral-900">¿Quién sos?</h2>
+            <h2 className="mb-1 text-sm font-bold text-neutral-900">
+              {account ? '¿A quién avisamos?' : '¿Quién sos?'}
+            </h2>
             <p className="mb-3 text-xs text-neutral-500">
               Para que {store.name} pueda avisarte cuando esté listo.
             </p>
@@ -401,6 +523,31 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
           </div>
 
           {/*
+            El comercio pide identificarse para pagar en mano. Se dice qué pide y
+            cuánto cuesta —un minuto, con el email— y la salida que no lo pide, si
+            existe. No "por seguridad" ni "para protegerte": el que se protege es el
+            comercio, y decirlo al revés es mentirle a quien está comprando.
+          */}
+          {hayQueEntrar && (
+            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 shrink-0 text-blue-700" />
+                <p className="text-sm font-bold text-blue-950">Identificate con ClubPay</p>
+              </div>
+              <p className="mt-1.5 text-sm leading-relaxed text-blue-950">
+                Para pagar {slot?.kind === 'reparto' ? 'al recibirlo' : 'al retirarlo'},{' '}
+                {store.name} pide que te identifiques. Se hace con tu email, en un minuto, y
+                volvés acá con el carrito como lo dejaste.
+              </p>
+              {tomaMercadoPago && (
+                <p className="mt-1.5 text-sm text-blue-950">
+                  Si preferís no hacerlo, podés pagar con Mercado Pago.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/*
             Solo cuando hay una libreta bloqueada que explicar. Si el comercio no da
             fiado, no hay nada que explicar y el botón queda suelto: un "hablá con
             el comercio" sin motivo al lado de las formas de pago no se entiende, y
@@ -497,7 +644,9 @@ export function Checkout({ store, account }: { store: Store; account: MerchantAc
               ? 'Mandando…'
               : cierre.kind === 'bloqueado'
                 ? 'Comercio cerrado'
-                : cierre.kind === 'confirmar'
+                : hayQueEntrar
+                  ? 'Identificarme con ClubPay'
+                  : cierre.kind === 'confirmar'
                   ? 'Dejar el pedido encargado'
                   : 'Hacer el pedido'}
           </button>

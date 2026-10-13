@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: **2026-09-23** · commit `4bdd4a4`
+Última revisión: **2026-10-13** · commit `05ff5fe` + CR-0003
 
 Leer siempre junto a `CLAUDE.md`. Actualizar este archivo cuando una tarea cambie el
 estado del sistema.
@@ -45,6 +45,7 @@ pueblo de **Morrison**.
 | **Botón "Ir a la tienda" en ClubPay** | ClubPay necesita `storefrontSlug` y `storefrontPublished` en la ficha del comercio. **Ese dato es de Nexo B2B** y es el único que impide que un comercio nuevo tenga tienda sin carga manual |
 | **Mercado Pago con plata real** | Probado contra el simulador. Ningún comercio lo tiene prendido todavía: la primera venta real la hace ClubPay, con plata de verdad, cuando Germán confirme el comercio de prueba |
 | **Árbol de góndolas de 3 niveles** | Soportado; falta que NexoPOS mande el nivel del medio. Mientras tanto se derivan las hojas y la fila se corta a 12 chips |
+| **Identidad para pagar en mano (CR-0003)** | Construido detrás de «reglas apagadas»: ida a ClubPay, `volver`, `orderRules`, `creditEnabled`, los `code` y `review`. Probado con fixtures (`FIXTURES_REGLAS=on`, `FIXTURES_SIN_LIBRETA=on`). ClubPay y NexoPOS ya desplegaron lo suyo; falta desplegar esto y probarlo contra el NexoPOS real con un comercio de prueba. Respuesta en `docs/respuesta-cr-0003-identidad.md` |
 | **Highlights** (más vendidos / más buscados) | Consumido. "Lo más buscado" va a estar vacío hasta que se junten búsquedas |
 
 ## Pendiente de otros equipos
@@ -101,6 +102,10 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
   `journalctl -u nexotienda`.
 
 ## Cambios recientes
+
+- **CR-0003, identidad para pagar en mano.** Una sesión es una persona identificada,
+  no una libreta. Arreglado de paso: con sesión y pago al retirar no se mandaba ni
+  cuenta ni contacto, y NexoPOS rechazaba el pedido con 400.
 
 - **El sandbox de pagos corría en producción** hasta el 11/10. Hubo tres pedidos
   marcados pagados sin plata (pruebas de septiembre, nunca entregados — Germán lo
