@@ -576,10 +576,10 @@ export const fixtures: NexoPosPort = {
 
     const totalCents = subtotalCents + feeCents;
 
-    // Lo mismo que valida NexoPOS. Antes del CR-0003, cuenta y contacto eran
-    // excluyentes; con las reglas prendidas pueden ir juntos.
-    if (input.accountId && input.contact && !store.orderRules.enabled) {
-      rechazo(400, { error: 'Un pedido va con cuenta corriente o con contacto, no con los dos.' });
+    // Lo mismo que valida NexoPOS. Desde el CR-0003 cuenta y contacto van juntos con
+    // cualquier forma de pago; el contacto es obligatorio salvo a la libreta.
+    if (input.paymentMethod !== 'cuenta_corriente' && !input.contact) {
+      rechazo(400, { error: 'Falta el nombre y el teléfono de quien compra.' });
     }
     if (input.paymentMethod === 'cuenta_corriente') {
       if (!input.accountId) {

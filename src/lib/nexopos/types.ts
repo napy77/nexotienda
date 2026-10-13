@@ -699,9 +699,8 @@ export interface NewOrder {
    * Quién compra, cuando se identificó con ClubPay. El camino normal es anónimo:
    * alguien entra, compra dos paquetes de harina y paga al recibirlos.
    *
-   * Con la libreta va siempre. Con las demás formas de pago va solo si el comercio
-   * prendió las reglas del CR-0003: antes de eso NexoPOS no acepta `accountId` y
-   * `contact` juntos.
+   * Va con cualquier forma de pago cuando hay sesión (CR-0003), junto con `contact`
+   * salvo a la libreta.
    */
   accountId?: string;
   /**

@@ -101,9 +101,13 @@ recibido → aceptado → listo → [en_camino] → entregado
 - `expectedTotalCents` va en el alta; si el precio cambió, `priceChanged` +
   `expectedTotalCents` vuelven y la pantalla lo dice.
 - `paymentMethod: "online"` **es Mercado Pago** y nada más.
-- `accountId` + `contact`: con la libreta va solo `accountId`. Con lo demás va
-  `contact` siempre, y `accountId` solo si `orderRules.enabled` (antes son excluyentes
-  en NexoPOS). **El nivel no se manda.**
+- `accountId` + `contact`: con sesión, `accountId` va con cualquier forma de pago;
+  `contact` va siempre salvo a la libreta. **`orderRules.enabled` no es señal de
+  nada más que «este comercio pide identificarse»** (lo pidió NexoPOS). Mientras el
+  NexoPOS desplegado los rechace juntos (400 sin `code`), el adapter reintenta sin la
+  cuenta — transición, se borra cuando confirmen. **El nivel no se manda.**
+- **Transferencia no existe en `POST /v1/orders`.** Con la API real nunca se ofrece
+  (el adapter arma efectivo, Mercado Pago y libreta); solo aparece en fixtures.
 - Rechazos del CR-0003, 409 con `{ error, code }`: `requiere_cuenta` y
   `nivel_insuficiente` (ofrecer identificarse), `excede_tope_monto` (`maxTotalCents`),
   `excede_tope_productos` (`maxItems`), `reparto_requiere_historial`,

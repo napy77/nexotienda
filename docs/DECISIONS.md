@@ -246,8 +246,8 @@ pago al recibir, un pedido así manda un cadete a la casa de alguien que no pidi
   `/entrar` con `volver`, un camino validado (nunca una URL).
 - La vidriera (`orderRules`) dice qué ofrecer; **decide el rechazo con `code`** de
   NexoPOS. La tienda no conoce ni manda el nivel de nadie.
-- `accountId` viaja con cualquier forma de pago solo con las reglas prendidas: antes
-  NexoPOS no acepta cuenta y contacto juntos.
+- `accountId` viaja con cualquier forma de pago cuando hay sesión. No se ata a
+  `orderRules.enabled` (pedido de NexoPOS el 13/10).
 - Todo pedido que no va a la libreta pide teléfono, haya sesión o no: ClubPay no se lo
   da al comercio. Esto arregló un bug: con sesión y pago al retirar no se mandaba ni
   cuenta ni contacto, y NexoPOS lo rechazaba.

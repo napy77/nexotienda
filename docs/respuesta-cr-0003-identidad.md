@@ -53,9 +53,9 @@ obligatorio y editable. Solo la libreta no los pide.
 
 ## 5. Pedidos
 
-- `accountId` va con la libreta siempre, y con las demás formas de pago **solo si
-  `orderRules.enabled`**: es la señal de que NexoPOS ya acepta cuenta y contacto juntos
-  (hoy son excluyentes y rebota con 400).
+- Con sesión, `accountId` va con cualquier forma de pago, junto con `contact` salvo a
+  la libreta. *(Actualizado el 13/10: al principio lo atábamos a `orderRules.enabled`;
+  NexoPOS pidió no hacerlo.)*
 - No mandamos el nivel.
 - Se decide por `code`; el texto de NexoPOS se muestra tal cual y el nuestro es solo
   respaldo:

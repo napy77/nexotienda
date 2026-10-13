@@ -570,8 +570,30 @@ export const client: NexoPosPort = {
   },
 
   // --- pedidos: escribe, pero no llega a ninguna cuenta ---
-  createOrder: (order: NewOrder) =>
-    pedidos<Order>('/v1/orders', { method: 'POST', body: JSON.stringify(order) }),
+  async createOrder(order: NewOrder) {
+    const mandar = (o: NewOrder) =>
+      pedidos<Order>('/v1/orders', { method: 'POST', body: JSON.stringify(o) });
+    try {
+      return await mandar(order);
+    } catch (e) {
+      /*
+        TRANSICIÓN (CR-0003) — borrar cuando NexoPOS confirme en producción que
+        acepta `accountId` y `contact` juntos.
+
+        Hasta entonces, el NexoPOS desplegado los rechaza juntos con un 400 sin
+        `code`. Un 400 no crea el pedido, así que reintentar sin la cuenta es seguro
+        y deja la venta igual que antes del CR: con contacto, anónima para NexoPOS.
+        No se decide por el texto: alcanza con que haya ido con los dos y sea un 400
+        sin `code`.
+      */
+      const conLosDos = order.accountId && order.contact;
+      if (conLosDos && e instanceof NexoPosError && e.status === 400 && !e.code) {
+        console.warn('[nexotienda] NexoPOS no aceptó cuenta y contacto juntos; va sin la cuenta');
+        return mandar({ ...order, accountId: undefined });
+      }
+      throw e;
+    }
+  },
   getOrder: (code) => pedidos<Order | null>(`/v1/orders/${code}`),
 
   async createCheckout(code, returnUrl) {

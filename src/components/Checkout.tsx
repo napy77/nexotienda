@@ -240,14 +240,13 @@ export function Checkout({
         address: slot?.kind === 'reparto' ? address.trim() : undefined,
         paymentMethod: payment,
         /*
-          Quién compra. Con la libreta va siempre. Con lo demás, solo si el comercio
-          prendió las reglas: ahí NexoPOS lo necesita para saber el nivel, y es
-          también lo que garantiza que ya entiende cuenta y contacto juntos — antes
-          del CR-0003 eran excluyentes y el pedido rebotaba. El nivel no se manda:
+          Quién compra, con cualquier forma de pago: NexoPOS lo necesita para saber
+          el nivel cuando el comercio pide identificarse. No depende de
+          `orderRules.enabled`, que solo dice "este comercio pide identificarse" y
+          ellos lo prenden y apagan sin pensar en el resto. El nivel no se manda:
           lo averigua NexoPOS.
         */
-        accountId:
-          account && (vaALaLibreta || store.orderRules.enabled) ? account.accountId : undefined,
+        accountId: account?.accountId,
         contact: vaALaLibreta ? undefined : { name: name.trim(), phone: phone.trim() },
         // Lo que esta pantalla le mostró recién. No es para cobrar —eso lo calcula
         // NexoPOS— sino para que pueda avisar si no coincide.
