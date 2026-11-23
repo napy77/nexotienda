@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: **2026-10-13** · commit `05ff5fe` + CR-0003
+Última revisión: **2026-11-23**
 
 Leer siempre junto a `CLAUDE.md`. Actualizar este archivo cuando una tarea cambie el
 estado del sistema.
@@ -60,6 +60,8 @@ pueblo de **Morrison**.
 5. **Aviso de campaña invisible** — ver `a-nexopos/campanas-que-no-se-ven.md`.
 6. **Que el sync de fichas avise cuando el cursor no avanza** — ver
    `a-nexopos/fichas-sync-sin-aviso.md`.
+7. **`phone` en la cuenta**, para precargar el teléfono de quien entró con ClubPay —
+   ver `a-nexopos/telefono-con-sesion.md` (23/11). La tienda ya lo lee.
 7. Nivel del medio del árbol de góndolas.
 8. Interruptor manual abierto/cerrado, con la caja como fuente opcional.
 9. Marca de desvinculación (`linkedAt` ya llega; confirmar que se mueve al desvincular).
@@ -103,6 +105,9 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
 
 ## Cambios recientes
 
+- **Teléfono precargado con sesión** (23/11). Si la cuenta trae `phone`, el checkout
+  lo precarga, editable. NexoPOS todavía no lo manda: hasta entonces se pide como
+  siempre.
 - **`/s/<slug>` desde otro host redirige al subdominio del comercio** (13/10). La
   página del pueblo dejaba comprar en un comercio bajo el host del pueblo: carrito y
   sesión en el origen equivocado, y ClubPay rechazaba el `volver`.

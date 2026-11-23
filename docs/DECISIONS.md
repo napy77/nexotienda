@@ -248,8 +248,8 @@ pago al recibir, un pedido así manda un cadete a la casa de alguien que no pidi
   NexoPOS. La tienda no conoce ni manda el nivel de nadie.
 - `accountId` viaja con cualquier forma de pago cuando hay sesión. No se ata a
   `orderRules.enabled` (pedido de NexoPOS el 13/10).
-- Todo pedido que no va a la libreta pide teléfono, haya sesión o no: ClubPay no se lo
-  da al comercio. Esto arregló un bug: con sesión y pago al retirar no se mandaba ni
+- Todo pedido que no va a la libreta pide teléfono, haya sesión o no. *(23/11: con
+  sesión se precarga si la cuenta trae `phone`, y se puede editar. Pedido a NexoPOS.)* Esto arregló un bug: con sesión y pago al retirar no se mandaba ni
   cuenta ni contacto, y NexoPOS lo rechazaba.
 - Un email verificado prueba una casilla, no una persona: lo que protege al comercio
   son sus topes y mirar las cuentas nuevas. La pantalla no dice «por tu seguridad».

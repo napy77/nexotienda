@@ -84,6 +84,9 @@ ClubPay antes de hacerlo.
 - `linkedAt` — se mueve cuando el vínculo cambia, **no en una consulta de rutina**. Si
   se moviera al consultar, cerraría la sesión de todo el mundo cada pocos minutos.
 - `closingDay` / `dueDay` — opcionales. Si no vienen, no se muestran.
+- `phone` — opcional, **pedido a NexoPOS el 23/11** (`a-nexopos/telefono-con-sesion.md`):
+  el de la ficha del cliente o, si no hay, el celular de ClubPay. Solo precarga el
+  checkout, editable; no está verificado. Ausente o en blanco: el campo se pide vacío.
 - **La pila de resúmenes ya no se pide.** Vive en ClubPay.
 
 ## Pedido

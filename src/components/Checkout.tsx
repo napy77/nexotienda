@@ -103,10 +103,10 @@ export function Checkout({
   const router = useRouter();
   const [slotId, setSlotId] = useState(store.slots[0]?.id ?? 'retiro');
   const [address, setAddress] = useState('');
-  // Con sesión, el nombre sale de la cuenta y se puede cambiar: es a quién busca el
-  // comercio cuando lo va a retirar. El teléfono se pide igual (ver abajo).
+  // Con sesión, nombre y teléfono salen de la cuenta y se pueden cambiar: es a quién
+  // busca el comercio y a dónde le avisa. Si la cuenta no trae teléfono, se pide.
   const [name, setName] = useState(account?.displayName ?? '');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(account?.phone ?? '');
   // NexoPOS contestó que este pedido necesita una cuenta. La vidriera puede estar
   // vieja y no haberlo dicho: el rechazo manda.
   const [pideEntrar, setPideEntrar] = useState(false);
@@ -153,7 +153,7 @@ export function Checkout({
   const showCredit = store.acceptedPayments.includes('cuenta_corriente');
 
   // Volvió de ClubPay: se deja todo como estaba. Lo del borrador gana sobre los
-  // defaults, salvo el nombre si ahora hay cuenta y no había escrito ninguno.
+  // defaults, salvo nombre y teléfono si ahora hay cuenta y no había escrito nada.
   useEffect(() => {
     const b = leerBorrador(borradorKey);
     if (!b) return;
@@ -161,7 +161,7 @@ export function Checkout({
     if (store.acceptedPayments.includes(b.payment)) setPayment(b.payment);
     setAddress(b.address);
     if (b.name) setName(b.name);
-    setPhone(b.phone);
+    if (b.phone) setPhone(b.phone);
   }, [borradorKey, store]);
 
   /*

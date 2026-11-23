@@ -493,6 +493,13 @@ export interface MerchantAccount {
   storeId: string;
   /** Cómo se llama la persona. Para poder mostrar de quién es la libreta abierta. */
   displayName?: string;
+  /**
+   * El teléfono que este comercio tiene de la persona: el de su ficha en NexoPOS o,
+   * si ahí no hay, el celular que la persona cargó en ClubPay. **Solo precarga el
+   * checkout**, editable: nadie lo verificó (en ClubPay el celular es opcional y no
+   * se valida). Ausente es ausente: el campo queda vacío y se pide, como siempre.
+   */
+  phone?: string;
   storeName: string;
   storeSlug: string;
   /**

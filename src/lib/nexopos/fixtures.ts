@@ -331,6 +331,7 @@ const accounts: MerchantAccount[] = [
     accountId: 'acc_sol_4b91',
     storeId: 'store-supersol',
     displayName: 'Germán Yovan',
+    phone: '3537 00-0001',
     linkedAt: '2026-09-17T10:00:00.000Z',
     storeName: 'Súper SOL',
     storeSlug: 'supersol',
