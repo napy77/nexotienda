@@ -84,9 +84,10 @@ ClubPay antes de hacerlo.
 - `linkedAt` — se mueve cuando el vínculo cambia, **no en una consulta de rutina**. Si
   se moviera al consultar, cerraría la sesión de todo el mundo cada pocos minutos.
 - `closingDay` / `dueDay` — opcionales. Si no vienen, no se muestran.
-- `phone` — opcional, **pedido a NexoPOS el 23/11** (`a-nexopos/telefono-con-sesion.md`):
-  el de la ficha del cliente o, si no hay, el celular de ClubPay. Solo precarga el
-  checkout, editable; no está verificado. Ausente o en blanco: el campo se pide vacío.
+- `phone` y `email` — siempre presentes, con el dato o `null` (NexoPOS, 23/11). Salen
+  de la ficha del cliente, que se completa con el primer pedido con `accountId` y,
+  cuando ClubPay lo mande, con el canje. Solo precargan el checkout, editables; no
+  están verificados. `null` o en blanco: el campo aparece vacío.
 - **La pila de resúmenes ya no se pide.** Vive en ClubPay.
 
 ## Pedido
@@ -116,6 +117,9 @@ recibido → aceptado → listo → [en_camino] → entregado
   `excede_tope_productos` (`maxItems`), `reparto_requiere_historial`,
   `libreta_no_activa`, `cuenta_bloqueada` (mensaje neutro, nunca decir «bloqueada»).
   `falta_cuenta` es 400. Sin el dato extra, el texto va sin número.
+- `contact: { name, phone, email? }` — el correo es **opcional**. NexoPOS descarta
+  uno mal escrito sin frenar el pedido; por eso la forma se valida en el carrito.
+  Los pedidos a la libreta no llevan `contact`, así que tampoco correo.
 - `review: { reason }` — el comercio lo mira antes de aceptarlo. **No es un estado**:
   sigue en `recibido`. El motivo no se le muestra al comprador.
 - `paymentStatus`: `no_aplica | pendiente | pagado | rechazado | reembolsado`. **Un

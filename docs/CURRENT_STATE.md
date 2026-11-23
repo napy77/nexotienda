@@ -19,7 +19,8 @@ pueblo de **Morrison**.
 - **Catálogo real**: góndolas con árbol de subrubros, búsqueda server-side, paginado.
   La portada no carga el catálogo entero.
 - **Ficha de producto** con galería (`images[]`), disponibilidad y compartible por URL.
-- **Carrito y checkout anónimo** (nombre + teléfono), con franjas de retiro y reparto.
+- **Carrito y checkout anónimo** (nombre + teléfono, correo opcional), con franjas de retiro
+  y reparto.
 - **Pedidos**: se crean en NexoPOS y caen como nota de venta. Seguimiento con estados
   contextuales y refresco automático.
 - **Comercio cerrado**: lo de góndola se puede encargar con confirmación; si el
@@ -60,8 +61,9 @@ pueblo de **Morrison**.
 5. **Aviso de campaña invisible** — ver `a-nexopos/campanas-que-no-se-ven.md`.
 6. **Que el sync de fichas avise cuando el cursor no avanza** — ver
    `a-nexopos/fichas-sync-sin-aviso.md`.
-7. **`phone` en la cuenta**, para precargar el teléfono de quien entró con ClubPay —
-   ver `a-nexopos/telefono-con-sesion.md` (23/11). La tienda ya lo lee.
+7. **Desplegar `phone` y `email` en la cuenta y `contact.email` en el pedido.** Hecho
+   y probado de su lado (23/11); sale con su próximo deploy. ClubPay todavía no les
+   manda celular ni correo en el canje.
 7. Nivel del medio del árbol de góndolas.
 8. Interruptor manual abierto/cerrado, con la caja como fuente opcional.
 9. Marca de desvinculación (`linkedAt` ya llega; confirmar que se mueve al desvincular).
@@ -105,9 +107,10 @@ otra pantalla", y aceptar vinculación por QR en el mostrador.
 
 ## Cambios recientes
 
-- **Teléfono precargado con sesión** (23/11). Si la cuenta trae `phone`, el checkout
-  lo precarga, editable. NexoPOS todavía no lo manda: hasta entonces se pide como
-  siempre.
+- **Teléfono y correo precargados con sesión; correo opcional en el carrito** (23/11).
+  Salen de la ficha del cliente en NexoPOS, editables. El correo va en
+  `contact.email`, para que NexoPOS pueda mandar el ticket y los avisos más adelante
+  (todavía no manda ninguno). Hasta su deploy, los campos aparecen vacíos.
 - **`/s/<slug>` desde otro host redirige al subdominio del comercio** (13/10). La
   página del pueblo dejaba comprar en un comercio bajo el host del pueblo: carrito y
   sesión en el origen equivocado, y ClubPay rechazaba el `volver`.

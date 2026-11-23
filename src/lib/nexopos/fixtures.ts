@@ -27,6 +27,8 @@ import type {
 import { arbolDe, productosDe } from '@/lib/arbol';
 import { NexoPosError } from './client';
 
+const TIENE_FORMA_DE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const TOWN = { slug: 'morrison', name: 'Morrison' };
 
 /**
@@ -332,6 +334,7 @@ const accounts: MerchantAccount[] = [
     storeId: 'store-supersol',
     displayName: 'Germán Yovan',
     phone: '3537 00-0001',
+    email: 'comprador@example.com',
     linkedAt: '2026-09-17T10:00:00.000Z',
     storeName: 'Súper SOL',
     storeSlug: 'supersol',
@@ -640,7 +643,13 @@ export const fixtures: NexoPosPort = {
       slotKind: slot.kind,
       address: input.address,
       accountId: input.accountId,
-      contact: input.contact,
+      // Como NexoPOS: un correo sin forma de correo no frena el pedido, se descarta.
+      contact: input.contact && {
+        ...input.contact,
+        email: input.contact.email && TIENE_FORMA_DE_CORREO.test(input.contact.email)
+          ? input.contact.email.toLowerCase()
+          : undefined,
+      },
       paymentMethod: input.paymentMethod,
       // El fiado no es un pago: es una anotación que se cobra en el cierre (D27).
       // El efectivo tampoco pasa por acá. Solo el rail online queda pendiente.

@@ -329,6 +329,7 @@ interface AccountWire {
   storeId: string;
   displayName?: string;
   phone?: string | null;
+  email?: string | null;
   storeName?: string;
   storeSlug?: string;
   balanceCents?: number;
@@ -352,6 +353,7 @@ function mapAccount(w: AccountWire): MerchantAccount {
     displayName: w.displayName,
     // Vacío o en blanco es que no hay: no se precarga nada (P6).
     phone: w.phone?.trim() || undefined,
+    email: w.email?.trim().toLowerCase() || undefined,
     storeName: w.storeName ?? '',
     storeSlug: w.storeSlug ?? '',
     // `null` es sin límite, que es el default y el caso más común: así funciona el

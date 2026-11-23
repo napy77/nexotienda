@@ -500,6 +500,11 @@ export interface MerchantAccount {
    * se valida). Ausente es ausente: el campo queda vacío y se pide, como siempre.
    */
   phone?: string;
+  /**
+   * El correo de la ficha, en minúsculas. Igual que `phone`: solo precarga, editable,
+   * sin verificar. Ausente es ausente.
+   */
+  email?: string;
   storeName: string;
   storeSlug: string;
   /**
@@ -628,11 +633,22 @@ export interface OrderLine {
   unitPriceCents: number;
 }
 
+/**
+ * Quién compra, para que el comercio le pueda avisar. El correo es opcional: NexoPOS
+ * lo guarda en el pedido para mandar el ticket y los avisos (todavía no manda
+ * ninguno), y uno mal escrito no frena el pedido de su lado — lo descarta.
+ */
+export interface Contacto {
+  name: string;
+  phone: string;
+  email?: string;
+}
+
 export interface Order {
   code: string;
   /** Ausente en la compra anónima, que es el camino normal. */
   accountId?: string;
-  contact?: { name: string; phone: string };
+  contact?: Contacto;
   storeId: string;
   storeName: string;
   storeSlug: string;
@@ -712,9 +728,10 @@ export interface NewOrder {
   accountId?: string;
   /**
    * Para poder avisarle del pedido. Obligatorio en todo pedido que no vaya a la
-   * libreta, **aunque haya sesión**: ClubPay no le da el teléfono al comercio.
+   * libreta, **aunque haya sesión**: con sesión, el teléfono se precarga de la
+   * cuenta, pero lo que vale es lo que quedó escrito.
    */
-  contact?: { name: string; phone: string };
+  contact?: Contacto;
   /**
    * El total que la pantalla le mostró al comprador cuando apretó el botón.
    *

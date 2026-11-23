@@ -54,6 +54,9 @@ const PAYMENT_UI: Record<
   },
 };
 
+/** La misma forma que acepta NexoPOS: `algo@algo.algo`. No prueba que exista. */
+const TIENE_FORMA_DE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Lo que la persona ya había cargado, guardado mientras va a identificarse a ClubPay.
  *
@@ -71,6 +74,8 @@ type Borrador = {
   address: string;
   name: string;
   phone: string;
+  /** Opcional: un borrador de antes del correo no lo tiene. */
+  email?: string;
   t: number;
 };
 
@@ -107,6 +112,8 @@ export function Checkout({
   // busca el comercio y a dónde le avisa. Si la cuenta no trae teléfono, se pide.
   const [name, setName] = useState(account?.displayName ?? '');
   const [phone, setPhone] = useState(account?.phone ?? '');
+  // Opcional. NexoPOS lo guarda para mandar el ticket y los avisos del pedido.
+  const [email, setEmail] = useState(account?.email ?? '');
   // NexoPOS contestó que este pedido necesita una cuenta. La vidriera puede estar
   // vieja y no haberlo dicho: el rechazo manda.
   const [pideEntrar, setPideEntrar] = useState(false);
@@ -162,6 +169,7 @@ export function Checkout({
     setAddress(b.address);
     if (b.name) setName(b.name);
     if (b.phone) setPhone(b.phone);
+    if (b.email) setEmail(b.email);
   }, [borradorKey, store]);
 
   /*
@@ -178,7 +186,7 @@ export function Checkout({
 
   function irAIdentificarse() {
     try {
-      const b: Borrador = { slotId, payment, address, name, phone, t: Date.now() };
+      const b: Borrador = { slotId, payment, address, name, phone, email, t: Date.now() };
       window.localStorage.setItem(borradorKey, JSON.stringify(b));
     } catch {
       // Sin almacenamiento se va igual: perder la franja es menos grave que no poder
@@ -223,12 +231,19 @@ export function Checkout({
       setError('Necesitamos la dirección para llevártelo.');
       return;
     }
-    // El comercio necesita poder avisarte, **también con sesión**: ClubPay no le da
-    // el teléfono a nadie. Solo la libreta no lo pide, porque el comercio ya te tiene
-    // en su ficha.
+    // El comercio necesita poder avisarte, **también con sesión**: el teléfono de la
+    // cuenta se precarga, pero puede no estar. Solo la libreta no lo pide, porque el
+    // comercio ya te tiene en su ficha.
     const vaALaLibreta = payment === 'cuenta_corriente';
     if (!vaALaLibreta && (name.trim().length < 2 || phone.trim().length < 6)) {
       setError('Dejanos tu nombre y un teléfono para poder avisarte.');
+      return;
+    }
+    // NexoPOS no frena un pedido por un correo mal escrito: lo descarta en silencio.
+    // Por eso se revisa acá, que es donde la persona lo puede arreglar.
+    const correo = email.trim();
+    if (!vaALaLibreta && correo && !TIENE_FORMA_DE_CORREO.test(correo)) {
+      setError('Revisá el correo, parece que le falta algo. Si no querés dejarlo, borralo.');
       return;
     }
     setConfirmando(false);
@@ -247,7 +262,9 @@ export function Checkout({
           lo averigua NexoPOS.
         */
         accountId: account?.accountId,
-        contact: vaALaLibreta ? undefined : { name: name.trim(), phone: phone.trim() },
+        contact: vaALaLibreta
+          ? undefined
+          : { name: name.trim(), phone: phone.trim(), email: correo || undefined },
         // Lo que esta pantalla le mostró recién. No es para cobrar —eso lo calcula
         // NexoPOS— sino para que pueda avisar si no coincide.
         expectedTotalCents: totalCents,
@@ -425,6 +442,21 @@ export function Checkout({
                 autoComplete="tel"
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Correo (opcional)"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+              <p className="text-xs text-neutral-500">
+                Para que {store.name} pueda mandarte el ticket y avisarte cómo va tu
+                pedido.
+              </p>
             </div>
           </div>
         )}
